@@ -1,4 +1,4 @@
-# shooters-open
+# 42game-shooters
 
 [![Linux.do](https://img.shields.io/badge/Linux.do-community-0EA5E9?logo=discourse&logoColor=white)](https://linux.do)
 
