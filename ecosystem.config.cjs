@@ -1,9 +1,9 @@
 module.exports = {
   apps: [
     {
-      name: 'shooters-open',
+      name: '42game-shooters',
       script: './server.mjs',
-      cwd: '/www/wwwroot/shooters-open',
+      cwd: '/www/wwwroot/42game-shooters',
       interpreter: 'node',
       instances: 1,
       exec_mode: 'fork',
