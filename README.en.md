@@ -1,10 +1,14 @@
 # shooters-open
 
+[![Linux.do](https://img.shields.io/badge/Linux.do-community-0EA5E9?logo=discourse&logoColor=white)](https://linux.do)
+
 [Chinese README](./README.md)
 
 An open-source derivative release based on the upstream project [`jay6697117/shooters`](https://github.com/jay6697117/shooters), continuing under the [MIT License](./LICENSE).
 
 This repository keeps the gameplay code, Node.js server, assets, and PVP-related scripts required for further development and deployment, while excluding local tooling, caches, generated output, and historical runtime data.
+
+Thanks to the Linux.do community for the testing, feedback, and discussion support.
 
 ## Overview
 
