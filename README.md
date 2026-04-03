@@ -1,6 +1,7 @@
 # 42game-shooters
 
 [![Linux.do](https://img.shields.io/badge/Linux.do-community-0EA5E9?logo=discourse&logoColor=white)](https://linux.do)
+[![在线体验](https://img.shields.io/badge/在线体验-game.42w.shop-22C55E?logo=googlechrome&logoColor=white)](https://game.42w.shop)
 
 [English README](./README.en.md)
 
@@ -9,6 +10,8 @@
 这个仓库保留了继续开发和部署所需的核心内容：前端游戏逻辑、Node.js 服务端、资源文件、PVP 相关脚本与测试；同时移除了本地工具目录、缓存、构建产物和历史运行数据。
 
 感谢 Linux.do 社区在测试、反馈和讨论中的支持。
+
+在线体验：<https://game.42w.shop>
 
 ## 项目简介
 
