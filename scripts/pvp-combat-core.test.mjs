@@ -6,7 +6,9 @@ import {
   PVP_COMBAT_ARENA,
   PVP_COMBAT_OBSTACLES,
   PVP_COMBAT_PLAYER,
+  buildCombatSnapshot,
   createInitialCombatState,
+  predictLocalPlayerState,
   stepCombatState
 } from '../src/pvp-combat-core.mjs';
 
@@ -178,6 +180,73 @@ test('weapon switch, reload and dash all work on the shared combat core', () => 
     ])
   );
   assert.ok(player.dashCooldownTicks > 0);
+});
+
+test('local prediction keeps active dash duration and direction from authoritative snapshots', () => {
+  const state = createInitialCombatState({
+    matchId: 'dash-prediction-test',
+    mode: 'duel',
+    players: makePlayers(2)
+  });
+
+  const player = state.players[0];
+  player.x = -10;
+  player.z = 0;
+  player.yaw = 0;
+
+  stepCombatState(
+    state,
+    new Map([
+      [
+        player.userKey,
+        {
+          moveX: 1,
+          moveY: 0,
+          aimYaw: 0,
+          fire: false,
+          reload: false,
+          dash: true
+        }
+      ]
+    ])
+  );
+
+  const snapshotPlayer = buildCombatSnapshot(state).players.find(
+    (entry) => entry.userId === player.userId
+  );
+  assert.ok(snapshotPlayer);
+  assert.ok(snapshotPlayer.dashSeconds > 0);
+  assert.ok(snapshotPlayer.dashDirX > 0);
+  assert.equal(snapshotPlayer.dashDirZ, 0);
+
+  const predicted = predictLocalPlayerState(snapshotPlayer, {
+    moveX: 0,
+    moveY: 0,
+    aimYaw: 0,
+    fire: false,
+    reload: false,
+    dash: false
+  });
+
+  stepCombatState(
+    state,
+    new Map([
+      [
+        player.userKey,
+        {
+          moveX: 0,
+          moveY: 0,
+          aimYaw: 0,
+          fire: false,
+          reload: false,
+          dash: false
+        }
+      ]
+    ])
+  );
+
+  assert.equal(predicted.x, Number(state.players[0].x.toFixed(3)));
+  assert.equal(predicted.z, Number(state.players[0].z.toFixed(3)));
 });
 
 test('duel mode ends after one player reaches three round wins', () => {
