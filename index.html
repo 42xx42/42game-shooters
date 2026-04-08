@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="shooters-asset-version" content="20260327-mobile-hud-v1" />
-  <title>閸楋繝鈧艾銇囨稊杈ㄦ灍</title>
+  <meta name="shooters-asset-version" content="20260322-pvp-reward-secure-1" />
+  <title>卡通大乱斗</title>
   <link rel="icon" type="image/x-icon" href="favicon.ico" />
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Bangers&family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;600;700&display=swap');
@@ -199,9 +199,7 @@
     .weaponInfo {
       display: flex;
       align-items: center;
-      justify-content: flex-start;
       gap: 8px;
-      min-width: 188px;
       padding: 6px 10px;
       border-radius: 8px;
       background: rgba(0, 0, 0, 0.45);
@@ -234,26 +232,12 @@
     }
 
     .weaponName {
-      min-width: 56px;
-      display: inline-block;
       font-weight: 700;
-      text-align: left;
-    }
-
-    .weaponAmmo {
-      min-width: 58px;
-      display: inline-block;
-      text-align: right;
-      font-variant-numeric: tabular-nums;
     }
 
     .weaponReserve {
-      min-width: 40px;
-      display: inline-block;
       opacity: 0.7;
       font-weight: 600;
-      text-align: right;
-      font-variant-numeric: tabular-nums;
     }
 
     @keyframes reloadPulse {
@@ -879,15 +863,16 @@
     }
 
     .mobileBtn.primary {
-      min-width: 112px;
-      min-height: 112px;
-      padding: 0;
-      border-radius: 50%;
-      color: #08111b;
-      background: radial-gradient(circle at 30% 28%, #d8fbff, #58c8ef 72%);
-      box-shadow:
-        inset 0 2px 10px rgba(255, 255, 255, 0.2),
-        0 18px 28px rgba(29, 168, 216, 0.3);
+      background: #3b82f6;
+      color: #ffffff;
+      border: 2px solid #93c5fd;
+      box-shadow: 0 4px 0 #1d4ed8, 0 8px 16px rgba(0, 0, 0, 0.3);
+      font-weight: 700;
+    }
+
+    .mobileBtn.primary:active {
+      transform: translateY(4px);
+      box-shadow: 0 0 0 #1d4ed8, 0 4px 8px rgba(0, 0, 0, 0.3);
     }
 
     .mobileBtn.compact {
@@ -1301,7 +1286,6 @@
 
     .weaponInfo {
       gap: 10px;
-      min-width: 196px;
       padding: 8px 10px;
       border-radius: 12px;
       background: rgba(4, 7, 12, 0.42);
@@ -1316,7 +1300,7 @@
     }
 
     .weaponName {
-      min-width: 60px;
+      min-width: 44px;
     }
 
     #timerPanel {
@@ -2007,11 +1991,6 @@
         min-width: 0;
       }
 
-      #mobileLookZone {
-        top: calc(max(10px, env(safe-area-inset-top)) + 152px);
-        left: 0;
-      }
-
       #mobileMovePad {
         width: 118px;
         height: 118px;
@@ -2032,13 +2011,18 @@
       }
 
       .mobileBtn.primary {
-        min-width: 96px;
-        min-height: 96px;
+        min-width: 98px;
+        min-height: 56px;
       }
 
       #mobileWeaponBtn,
       #mobileGrenadeBtn {
         min-width: 118px;
+      }
+
+      #mobileLookZone {
+        top: calc(max(10px, env(safe-area-inset-top)) + 152px);
+        left: 0;
       }
 
       #mobileLookZoneLabel {
@@ -2083,163 +2067,9 @@
         margin-left: -23px;
         margin-top: -23px;
       }
-
-      .mobileBtn.primary {
-        min-width: 88px;
-        min-height: 88px;
-      }
-    }
-	  </style>
-
-  <!-- E-Sports Clean Override -->
-  <style id="esports-override">
-    :root {
-      /* Riot-like clean colors */
-      --bg-top: #0f1923;
-      --bg-horizon: #1e293b;
-
-      --ui-dark: #0f1923;
-      --ui-light: #ece8e1;
-
-      --accent-red: #ff4655; /* Valorant red */
-      --accent-red-dark: #cc3643;
-
-      --accent-blue: #0ea5e9;
-      --accent-blue-dark: #0284c7;
-
-      /* Re-map standard game colors to more solid, less neon tones */
-      --p1: #10b981;
-      --p2: #ff4655;
-      --p3: #0ea5e9;
-      --p4: #f59e0b;
-
-      --panel: rgba(15, 25, 35, 0.95);
-      --panel-border: rgba(236, 232, 225, 0.15);
-      --shadow: rgba(0, 0, 0, 0.4);
     }
 
-    body {
-      background: #0f1923; /* Solid sleek dark blue/gray */
-    }
-
-    /* Core panels and menus */
-    .menuSurface {
-      background: var(--panel) !important;
-      border: 1px solid var(--panel-border) !important;
-      border-radius: 4px !important;
-      box-shadow: 0 16px 32px rgba(0, 0, 0, 0.6) !important;
-      backdrop-filter: none !important;
-      -webkit-backdrop-filter: none !important;
-    }
-
-    .panel {
-      background: rgba(15, 25, 35, 0.7) !important;
-      border: 1px solid var(--panel-border) !important;
-      border-radius: 4px !important;
-      box-shadow: none !important;
-      backdrop-filter: none !important;
-    }
-
-    /* Solid crisp typography for names and headers */
-    .nameTag {
-      background: rgba(15, 25, 35, 0.85);
-      color: var(--ui-light);
-      border: 1px solid rgba(236, 232, 225, 0.2);
-      border-radius: 2px;
-      padding: 4px 10px 2px;
-      box-shadow: 2px 2px 0 rgba(0,0,0,0.5);
-      text-transform: uppercase;
-      font-weight: 600;
-      letter-spacing: 0.05em;
-      text-shadow: none !important;
-    }
-
-    /* Timer - clear and blocky */
-    #timer {
-      background: var(--panel) !important;
-      border: 1px solid var(--panel-border) !important;
-      border-radius: 4px !important;
-      box-shadow: 4px 4px 0 rgba(0,0,0,0.5) !important;
-      text-shadow: none !important;
-      font-weight: bold;
-      color: var(--ui-light);
-      padding: 8px 24px 6px !important;
-    }
-
-    /* Buttons - Hard edges, solid colors, physical push effect */
-    .modeBtn, .difficultyBtn, button, .btn {
-      background: rgba(15, 25, 35, 0.8) !important;
-      border: 1px solid rgba(236, 232, 225, 0.3) !important;
-      color: var(--ui-light) !important;
-      border-radius: 2px !important;
-      text-transform: uppercase;
-      font-weight: 600;
-      letter-spacing: 0.05em;
-      transition: transform 0.1s, background 0.1s !important;
-      box-shadow: 0 4px 0 rgba(0,0,0,0.5) !important;
-      text-shadow: none !important;
-    }
-
-    .modeBtn:hover, .difficultyBtn:hover, button:hover, .btn:hover {
-      background: rgba(236, 232, 225, 0.1) !important;
-      transform: translateY(2px) !important;
-      box-shadow: 0 2px 0 rgba(0,0,0,0.5) !important;
-    }
-
-    .modeBtn:active, .difficultyBtn:active, button:active, .btn:active {
-      transform: translateY(4px) !important;
-      box-shadow: none !important;
-    }
-
-    /* Active states for selection buttons */
-    .modeBtn.active, .difficultyBtn.active {
-      background: var(--ui-light) !important;
-      color: var(--ui-dark) !important;
-      border-color: var(--ui-light) !important;
-      transform: translateY(2px) !important;
-      box-shadow: 0 2px 0 rgba(0,0,0,0.5) !important;
-    }
-
-    /* Mobile Controls - Physical button feel */
-    .mobileBtn {
-      background: rgba(15, 25, 35, 0.6) !important;
-      border: 2px solid rgba(236, 232, 225, 0.2) !important;
-      border-radius: 50% !important; /* Keep round if they were round */
-      box-shadow: inset 0 -4px 0 rgba(0,0,0,0.4), 0 8px 16px rgba(0,0,0,0.5) !important;
-      backdrop-filter: none !important;
-    }
-
-    .mobileBtn:active {
-      box-shadow: inset 0 -1px 0 rgba(0,0,0,0.4), 0 2px 4px rgba(0,0,0,0.5) !important;
-      transform: scale(0.95) translateY(2px);
-    }
-
-    .mobileBtn.primary {
-      background: var(--accent-red) !important;
-      border-color: var(--accent-red-dark) !important;
-      box-shadow: inset 0 -4px 0 var(--accent-red-dark), 0 8px 16px rgba(0,0,0,0.5) !important;
-      color: #fff !important;
-    }
-
-    /* Canvas shadow - grounding the game */
-    #canvasWrap {
-      box-shadow: 0 32px 64px rgba(0, 0, 0, 0.8) !important;
-      border: 1px solid rgba(236, 232, 225, 0.05);
-    }
-
-    /* Remove any lingering neon box-shadows on HP segments */
-    .hpSeg {
-      box-shadow: none !important;
-      border-radius: 0 !important; /* blocky HP bars */
-    }
-    .hpWrap {
-      border-radius: 2px !important;
-      border: 1px solid var(--panel-border) !important;
-      background: rgba(0,0,0,0.5) !important;
-      box-shadow: 2px 2px 0 rgba(0,0,0,0.5) !important;
-    }
-
-    /* Dark scrollbar 鈥?matches esports dark palette */
+    /* Dark scrollbar matches the game's dark HUD palette. */
     html {
       scrollbar-color: rgba(236, 232, 225, 0.28) rgba(10, 14, 22, 0.92);
       scrollbar-width: thin;
@@ -2267,23 +2097,23 @@
     ::-webkit-scrollbar-corner {
       background: rgba(10, 14, 22, 0.92);
     }
-  </style>
-</head>
+	  </style>
+	</head>
 	<body>
 	  <div id="app">
     <div id="canvasWrap">
 	      <canvas id="scene" tabindex="0"></canvas>
 	      <div id="hud" data-mode="menu">
 	        <!-- <button id="visualToggle" type="button" aria-label="Toggle visuals">
-	          閻㈠娼?<span class="pill" id="visualToggleLabel">3D濡€崇€?/span>
+	          画面 <span class="pill" id="visualToggleLabel">3D模型</span>
 	        </button> -->
 	        <div id="playerPanels"></div>
 
         <div id="timerPanel">
-          <div id="timer">閺冨爼妫? 01:45</div>
+          <div id="timer">时间: 01:45</div>
           <div id="matchMeta">
-            <span class="hudChip" id="modeBadge">1v1 鐎电懓鍠?/span>
-            <span class="hudChip calm" id="dangerBadge">閹存ê婧€缁嬪啿鐣?/span>
+            <span class="hudChip" id="modeBadge">1v1 对决</span>
+            <span class="hudChip calm" id="dangerBadge">战场稳定</span>
           </div>
           <div id="roundPips">
             <span class="pip"></span><span class="pip"></span><span class="pip"></span><span class="pip"></span><span class="pip"></span>
@@ -2291,61 +2121,61 @@
         </div>
 
 	        <div id="bottomBar">
-		          <div id="controls" class="panel">WASD 缁夎濮?璺?姒х姵鐖?閻嫬鍣?璺?瀹革箓鏁?闂€鎸庡瘻 鐏忓嫬鍤?璺?1/2/3 閸掑洦宕插锕€娅?璺?E 闊垹鍤?璺?缁岀儤鐗?闂傤亪浼?璺?R 閹广垹鑴?璺?G 閹舵洘骞忛幍瀣祫 璺?Tab 閹烘帟顢戝?璺?P 閺嗗倸浠?璺?V 閸掑洦宕茬憴鍡氼潡</div>
-	          <div id="dash">闂傤亪浼?div class="cooldown"></div></div>
+		          <div id="controls" class="panel">WASD 移动 · 鼠标 瞄准 · 左键/长按 射击 · 1/2/3 切换武器 · E 踢击 · 空格 闪避 · R 换弹 · G 投掷手雷 · Tab 排行榜 · P 暂停 · V 切换视角</div>
+	          <div id="dash">闪避<div class="cooldown"></div></div>
 	        </div>
 
         <div id="mobileControls" aria-hidden="true">
           <div id="mobilePortraitBlocker">
             <div id="mobilePortraitCard">
-              <div id="mobilePortraitGlyph">閳?/div>
-              <div id="mobilePortraitTitle">鐠囬攱铆鐏炲繑鍨弬?/div>
-              <div id="mobilePortraitText">缁夎濮╃粩顖涘灛閺傛鏅棃銏犲嚒閺€閫涜礋濡亜鐫嗘导妯哄帥閵嗗倹妫嗘潪顒冾啎婢跺洤鎮楅崘宥囨埛缂侇厽鎼锋担婊愮礉娑擃厼銇庣憴鍡涘櫣娴兼矮绻氶幐浣哥暚閺佹番鈧?/div>
+              <div id="mobilePortraitGlyph">↻</div>
+              <div id="mobilePortraitTitle">请横屏战斗</div>
+              <div id="mobilePortraitText">移动端战斗界面已改为横屏优先。旋转设备后再继续操作，中央视野会保持完整。</div>
             </div>
           </div>
           <div id="mobileTopHud">
             <div class="mobileTopCard">
-              <div class="mobileTopLabel">閹存ê鐪?/div>
-              <div class="mobileTopValue" id="mobileTopTimer">閸撯晙缍?01:45</div>
+              <div class="mobileTopLabel">战局</div>
+              <div class="mobileTopValue" id="mobileTopTimer">剩余 01:45</div>
               <div class="mobileTopMeta">
-                <span class="mobileChip" id="mobileModeChip">1v1 鐎电懓鍠?/span>
-                <span class="mobileChip" id="mobileDangerChip">閹存ê婧€缁嬪啿鐣?/span>
+                <span class="mobileChip" id="mobileModeChip">1v1 对决</span>
+                <span class="mobileChip" id="mobileDangerChip">战场稳定</span>
               </div>
             </div>
             <div class="mobileTopCard secondary">
-              <div class="mobileTopLabel">閻樿埖鈧?/div>
-              <div class="mobileTopValue" id="mobileWeaponName">閹靛鐏?/div>
-              <div class="mobileTopValue" id="mobileWeaponAmmo">HP 100 璺?12/12</div>
+              <div class="mobileTopLabel">状态</div>
+              <div class="mobileTopValue" id="mobileWeaponName">手枪</div>
+              <div class="mobileTopValue" id="mobileWeaponAmmo">HP 100 · 12/12</div>
             </div>
-            <button class="mobileBtn compact ghost" id="mobilePauseBtn" type="button">閺嗗倸浠?/button>
+            <button class="mobileBtn compact ghost" id="mobilePauseBtn" type="button">暂停</button>
           </div>
           <div id="mobileLookZone">
-            <div id="mobileLookZoneLabel">閸欏厖鏅跺鎴濆З鏉烆剙鎮?/div>
+            <div id="mobileLookZoneLabel">右侧滑动转向</div>
           </div>
           <div id="mobileMoveDock">
             <div id="mobileMovePad">
               <div id="mobileMoveThumb"></div>
             </div>
-            <div id="mobileMoveHint">瀹革附澧滅粔璇插З</div>
+            <div id="mobileMoveHint">左手移动</div>
           </div>
           <div id="mobileActionDock">
             <div id="mobileTacticalDrawer" data-expanded="false">
-              <button class="mobileBtn" id="mobileWeaponBtn" type="button">閸掑洦鐏?/button>
-              <button class="mobileBtn" id="mobileGrenadeBtn" type="button">閹靛娴?/button>
+              <button class="mobileBtn" id="mobileWeaponBtn" type="button">切枪</button>
+              <button class="mobileBtn" id="mobileGrenadeBtn" type="button">手雷</button>
             </div>
             <div id="mobileActionRail">
-              <button class="mobileBtn compact ghost" id="mobileTacticalBtn" type="button">閹存ɑ婀?/button>
+              <button class="mobileBtn compact ghost" id="mobileTacticalBtn" type="button">战术</button>
               <div class="mobileActionRow">
-                <button class="mobileBtn" id="mobileReloadBtn" type="button">閹广垹鑴?/button>
-                <button class="mobileBtn" id="mobileDashBtn" type="button">闂傤亪浼?/button>
+                <button class="mobileBtn" id="mobileReloadBtn" type="button">换弹</button>
+                <button class="mobileBtn" id="mobileDashBtn" type="button">闪避</button>
               </div>
-              <button class="mobileBtn primary" id="mobileFireBtn" type="button">瀵偓閻?/button>
+              <button class="mobileBtn primary" id="mobileFireBtn" type="button">开火</button>
             </div>
           </div>
         </div>
 
-        <div id="banner" data-suppressed="false">缁楊兛绔撮崶鐐叉値 璺?瀵偓婵绱?/div>
-        <div id="suddenDeath">濞堝﹥顒存稉鈧幖?/div>
+        <div id="banner" data-suppressed="false">第一回合 · 开始！</div>
+        <div id="suddenDeath">殊死一搏</div>
 
 	        <div id="menuOverlay" class="overlay visible">
             <div class="menuSurface">
@@ -2353,80 +2183,80 @@
                 <div class="menuEyebrow" id="menuEyebrow">Arena Ready</div>
                 <div class="menuChip" id="menuChip">DUEL BENCHMARK</div>
               </div>
-	            <h1>閸楋繝鈧艾銇囨稊杈ㄦ灍</h1>
-	            <div class="subtitle" id="modeSubtitle">韫囶偉濡總蹇曟畱瀵邦喖鐎风粩鐐村Η閸?1v1 鐎电懓鍠呴妴?/div>
+	            <h1>卡通大乱斗</h1>
+	            <div class="subtitle" id="modeSubtitle">快节奏的微型竞技场 1v1 对决。</div>
               <div class="menuStats">
                 <div class="menuStat">
-                  <span>濡€崇础</span>
-                  <strong id="menuModeStat">1v1 鐎电懓鍠?/strong>
+                  <span>模式</span>
+                  <strong id="menuModeStat">1v1 对决</strong>
                 </div>
                 <div class="menuStat">
                   <span>AI</span>
-                  <strong id="menuDifficultyStat">閺傜増澧?/strong>
+                  <strong id="menuDifficultyStat">新手</strong>
                 </div>
                 <div class="menuStat">
-                  <span>閼哄倸顨?/span>
+                  <span>节奏</span>
                   <strong id="menuTempoStat">Crisp 1v1 gunfeel</strong>
                 </div>
               </div>
 	            <div class="modeSelect">
-	              <button class="modeBtn" data-mode="duel">1v1 鐎电懓鍠?/button>
-	              <button class="modeBtn" data-mode="deathmatch">4娴?娑旇鲸鏋?/button>
+	              <button class="modeBtn" data-mode="duel">1v1 对决</button>
+	              <button class="modeBtn" data-mode="deathmatch">4人 乱斗</button>
 	            </div>
-	            <div class="rules" id="modeRules">娴滄柨鐪稉澶庡劏 璺?1:45 閺冨爼妫块梽鎰煑 璺?閻栧棛鍋㈠鑸垫￥瀹割喖鍩嗘导銈咁唺</div>
+	            <div class="rules" id="modeRules">五局三胜 · 1:45 时间限制 · 爆炸桶无差别伤害</div>
 	            <div class="difficultySelect" id="difficultySelect">
-	              <div class="difficultyLabel" id="difficultyLabel">AI 闂呮儳瀹?/div>
+	              <div class="difficultyLabel" id="difficultyLabel">AI 难度</div>
 	              <div class="difficultyButtons">
-	                <button class="difficultyBtn" data-diff="novice" type="button">閺傜増澧?/button>
-	                <button class="difficultyBtn" data-diff="easy" type="button">缁犫偓閸?/button>
-	                <button class="difficultyBtn" data-diff="normal" type="button">閺咁噣鈧?/button>
-	                <button class="difficultyBtn" data-diff="hard" type="button">閸ヤ即姣?/button>
+	                <button class="difficultyBtn" data-diff="novice" type="button">新手</button>
+	                <button class="difficultyBtn" data-diff="easy" type="button">简单</button>
+	                <button class="difficultyBtn" data-diff="normal" type="button">普通</button>
+	                <button class="difficultyBtn" data-diff="hard" type="button">困难</button>
 	              </div>
 	            </div>
-              <div class="rules mobileOnlyBlock">閹靛婧€閿涙艾涔忛幍瀣╅崝顭掔礉閸欏厖鏅跺鎴濆З閻嫬鍣敍灞藉礁娑撳瀵滈柦顔肩磻閻忣偂绗岄幙宥勭稊閵?/div>
+              <div class="rules mobileOnlyBlock">手机：左手移动，右侧滑动瞄准，右下按钮开火与操作。</div>
               <div class="accountActions mobileOnlyRow">
-                <button class="accountBtn" id="touchStartBtn" type="button">瀵偓婵鐖堕幋?/button>
+                <button class="accountBtn" id="touchStartBtn" type="button">开始游戏</button>
               </div>
-	            <div class="statLine menuStartLine">閹?<strong>Enter閸ョ偠婧呴柨?/strong> 瀵偓婵?/div>
-	            <div id="bestTime">閺堚偓韫囶偉骞忛懗婊勬闂? --</div>
+	            <div class="statLine menuStartLine">按 <strong>Enter回车键</strong> 开始</div>
+	            <div id="bestTime">最快获胜时间: --</div>
               <div class="accountCard" id="aimSettingsPanel">
                 <div class="accountCardHead">
                   <div>
                     <div class="accountEyebrow">FPS Aim</div>
-                    <strong>缁楊兛绔存禍铏剐為幍瀣妳</strong>
+                    <strong>第一人称手感</strong>
                   </div>
                   <span class="aimSettingsValue" id="aimSensitivityValue">100%</span>
                 </div>
-                <p class="accountMeta">瀹稿弶濡哥粭顑跨娴滆櫣袨鐟欏棜顫楅崑姘啊闂冭尙鏁ユ鐐差槱閻炲棎鈧倽绻栭柌宀€娈戦悘鍨櫛鎼达缚绱伴崥灞炬娴ｆ粎鏁ゆ禍搴ㄧ炊閺嶅洤鎷伴幍瀣簚閸欏厖鏅跺鎴濆З鐟欏棜顫楅妴?/p>
+                <p class="accountMeta">已把第一人称视角做了防甩飞处理。这里的灵敏度会同时作用于鼠标和手机右侧滑动视角。</p>
                 <div class="aimSettingsRow">
-                  <span class="aimSettingsLabel">閻忓灚鏅辨惔?/span>
-                  <span class="accountMeta" style="margin: 0;">閺囧菙閸掔増娲胯箛?/span>
+                  <span class="aimSettingsLabel">灵敏度</span>
+                  <span class="accountMeta" style="margin: 0;">更稳到更快</span>
                 </div>
                 <input id="aimSensitivityRange" class="aimSlider" type="range" min="55" max="220" step="5" value="115" />
                 <div class="accountActions">
-                  <button class="accountBtn secondary small" id="aimSensitivityLowBtn" type="button">缁嬪厖绔撮悙?/button>
-                  <button class="accountBtn secondary small" id="aimSensitivityDefaultBtn" type="button">姒涙顓?/button>
-                  <button class="accountBtn secondary small" id="aimSensitivityHighBtn" type="button">韫囶偂绔撮悙?/button>
+                  <button class="accountBtn secondary small" id="aimSensitivityLowBtn" type="button">稳一点</button>
+                  <button class="accountBtn secondary small" id="aimSensitivityDefaultBtn" type="button">默认</button>
+                  <button class="accountBtn secondary small" id="aimSensitivityHighBtn" type="button">快一点</button>
                 </div>
               </div>
               <div class="accountCard" id="accountPanel">
                 <div class="accountCardHead">
                   <div>
                     <div class="accountEyebrow">Linux.do</div>
-                    <strong id="accountStatusTitle">Linux.do 閻ц缍?/strong>
+                    <strong id="accountStatusTitle">Linux.do 登录</strong>
                   </div>
-                  <a class="accountAdminLink" id="accountAdminLink" href="/admin.html" hidden>閸氬骸褰?/a>
+                  <a class="accountAdminLink" id="accountAdminLink" href="/admin.html" hidden>后台</a>
                 </div>
-                <p class="accountMeta" id="accountStatusMeta">鐠囧嘲婀В鏃囩瀵偓婵澧犻惂璇茬秿閵嗗倸褰ч張澶庡劏閺?MVP 閹靛秷鍏樻０鍡楀絿鐠囥儱鐪€电懓绨查惃?1 娑?CDK閵?/p>
+                <p class="accountMeta" id="accountStatusMeta">请在比赛开始前登录。只有胜方 MVP 才能领取该局对应的 1 个 CDK。</p>
                 <div class="accountActions">
-                  <a class="accountBtn" id="accountLoginBtn" href="/auth/linuxdo/start?returnTo=%2F">閻ц缍?/a>
-                  <button class="accountBtn" id="accountClaimBtn" type="button" hidden>妫板棗褰?CDK</button>
-                  <button class="accountBtn secondary" id="accountLogoutBtn" type="button" hidden>闁偓閸戣櫣娅ヨぐ?/button>
+                  <a class="accountBtn" id="accountLoginBtn" href="/auth/linuxdo/start?returnTo=%2F">登录</a>
+                  <button class="accountBtn" id="accountClaimBtn" type="button" hidden>领取 CDK</button>
+                  <button class="accountBtn secondary" id="accountLogoutBtn" type="button" hidden>退出登录</button>
                 </div>
                 <div class="accountCodeCard" id="accountCodeCard" hidden>
-                  <span class="accountCodeLabel" id="accountCodeLabel">閺堚偓鏉╂垿顣崣鏍畱 CDK</span>
+                  <span class="accountCodeLabel" id="accountCodeLabel">最近领取的 CDK</span>
                   <code id="accountCodeValue">-</code>
-                  <button class="accountBtn secondary small" id="accountCopyBtn" type="button" hidden>婢跺秴鍩?/button>
+                  <button class="accountBtn secondary small" id="accountCopyBtn" type="button" hidden>复制</button>
                 </div>
                 <div id="accountFeedback"></div>
               </div>
@@ -2434,39 +2264,39 @@
 	        </div>
 
         <div id="pauseOverlay" class="overlay">
-          <h1>瀹稿弶娈忛崑?/h1>
-          <div class="subtitle">閹?闂堛垺婢?P闁?/ Esc闁?閹垹顦插〒鍛婂灆</div>
+          <h1>已暂停</h1>
+          <div class="subtitle">按 面板 P键 / Esc键 恢复游戏</div>
           <div class="accountActions mobileOnlyRow">
-            <button class="accountBtn" id="touchPauseResumeBtn" type="button">缂佈呯敾濞撳憡鍨?/button>
+            <button class="accountBtn" id="touchPauseResumeBtn" type="button">继续游戏</button>
           </div>
         </div>
 
         <div id="matchOverlay" class="overlay">
-          <h1 id="matchTitle">閻溾晛顔?1 閼剧柉鍎ㄩ敍?/h1>
-          <div class="subtitle" id="matchStats">濮ｆ棁绂岄悽銊︽: 00:00</div>
+          <h1 id="matchTitle">玩家 1 获胜！</h1>
+          <div class="subtitle" id="matchStats">比赛用时: 00:00</div>
           <div class="accountCard" id="matchAwardPanel" hidden>
             <div class="accountCardHead">
               <div>
-                <div class="accountEyebrow">MVP 婵傛牕濮?/div>
-                <strong id="matchAwardTitle">閸欘亝婀侀懗婊勬煙 MVP 閹靛秷鍏樻０鍡楀絿 CDK閵?/strong>
+                <div class="accountEyebrow">MVP 奖励</div>
+                <strong id="matchAwardTitle">只有胜方 MVP 才能领取 CDK。</strong>
               </div>
             </div>
-            <p class="accountMeta" id="matchAwardMeta">鐠囧嘲婀В鏃囩瀵偓婵澧犻惂璇茬秿閵嗗倹鐦℃稉鈧崷铏诡儊閸氬牊娼禒鍓佹畱濮ｆ棁绂岄崣顏冪窗濞叉儳褰?1 娑?CDK閵?/p>
+            <p class="accountMeta" id="matchAwardMeta">请在比赛开始前登录。每一场符合条件的比赛只会派发 1 个 CDK。</p>
             <div class="accountActions">
-              <button class="accountBtn" id="matchAwardClaimBtn" type="button" hidden>妫板棗褰囬張顒€鐪?CDK</button>
-              <button class="accountBtn secondary small" id="matchAwardCopyBtn" type="button" hidden>婢跺秴鍩?/button>
+              <button class="accountBtn" id="matchAwardClaimBtn" type="button" hidden>领取本局 CDK</button>
+              <button class="accountBtn secondary small" id="matchAwardCopyBtn" type="button" hidden>复制</button>
             </div>
             <div class="accountCodeCard" id="matchAwardCodeCard" hidden>
-              <span class="accountCodeLabel">閺堫剙鐪?CDK</span>
+              <span class="accountCodeLabel">本局 CDK</span>
               <code id="matchAwardCodeValue">-</code>
             </div>
             <div id="matchAwardFeedback"></div>
           </div>
           <div class="accountActions mobileOnlyRow">
-            <button class="accountBtn" id="touchRestartBtn" type="button">閸愬秵娼垫稉鈧仦鈧?/button>
+            <button class="accountBtn" id="touchRestartBtn" type="button">再来一局</button>
           </div>
-          <div class="rules">閹?Enter閸ョ偠婧呴柨?闁插秵鏌婂鈧慨?/div>
-          <div id="bestTimeEnd">閺堚偓韫囶偉骞忛懗婊勬闂? --</div>
+          <div class="rules">按 Enter回车键 重新开始</div>
+          <div id="bestTimeEnd">最快获胜时间: --</div>
         </div>
 
         <div id="pvpPlaceholderOverlay" class="overlay">
@@ -2474,24 +2304,24 @@
             <div class="accountCardHead">
               <div>
                 <div class="accountEyebrow">PVP Placeholder</div>
-                <strong id="pvpPlaceholderTitle">PVP 閹村潡妫垮鑼矋婵?/strong>
+                <strong id="pvpPlaceholderTitle">PVP 房间已组好</strong>
               </div>
             </div>
-            <p class="accountMeta" id="pvpPlaceholderMeta">閹村潡妫块崪宀€甯虹€规湹绗傛稉瀣瀮瀹歌弓绻氶悾娆欑礉閻喐顒滈崷銊у殠閸氬本顒為幋妯绘灍娴兼艾婀稉瀣╃闂冭埖顔岄幒銉ュ弳閵?/p>
+            <p class="accountMeta" id="pvpPlaceholderMeta">房间和玩家上下文已保留，真正在线同步战斗会在下一阶段接入。</p>
             <ul class="pvpPlaceholderRoster" id="pvpPlaceholderRoster"></ul>
-            <div class="rules" id="pvpPlaceholderHint">瑜版挸澧犻弰顖氬窗娴ｅ秴绱戦幋妯荤ウ缁嬪绱版稉宥勭窗鏉╂稑鍙嗛張顒€婀?PVE閿涘奔绡冩稉宥勭窗鐟欙箑褰傜€广垺鍩涚粩顖濆殰閹躲儱绱＄紒鎾剁暬閵?/div>
+            <div class="rules" id="pvpPlaceholderHint">当前是占位开战流程：不会进入本地 PVE，也不会触发客户端自报式结算。</div>
             <div class="accountActions">
-              <button class="accountBtn" id="pvpPlaceholderRefreshBtn" type="button">閸掗攱鏌婇幋鍧楁？閻樿埖鈧?/button>
-              <button class="accountBtn secondary" id="pvpPlaceholderMenuBtn" type="button">鏉╂柨娲栭懣婊冨礋</button>
-              <button class="accountBtn secondary" id="pvpPlaceholderLeaveBtn" type="button">缁傝绱戦幋鍧楁？</button>
+              <button class="accountBtn" id="pvpPlaceholderRefreshBtn" type="button">刷新房间状态</button>
+              <button class="accountBtn secondary" id="pvpPlaceholderMenuBtn" type="button">返回菜单</button>
+              <button class="accountBtn secondary" id="pvpPlaceholderLeaveBtn" type="button">离开房间</button>
             </div>
           </div>
         </div>
 
         <div id="leaderboardOverlay" class="overlay">
-          <h1>閹烘帟顢戝?/h1>
+          <h1>排行榜</h1>
           <div class="leaderboardList" id="leaderboardList"></div>
-          <div class="rules">闂€鎸庡瘻 Tab 闁款喗鐓￠惇?/div>
+          <div class="rules">长按 Tab 键查看</div>
         </div>
 
         <div id="fpsCrosshair">
@@ -2509,15 +2339,15 @@
         <div id="dramaticOverlay"></div>
         <div id="screenPulse" data-kind="idle" data-severity="calm"></div>
         <div id="combatFeed" data-kind="idle" data-severity="calm" data-emphasis="standard">
-          <div id="combatFeedLabel">閹存ê婧€缁嬪啿鐣?/div>
-          <div id="combatFeedMeta">閸忓牐顫囩€电噦绱濋崘宥呭竾閺嬵亗鈧?/div>
+          <div id="combatFeedLabel">战场稳定</div>
+          <div id="combatFeedMeta">先观察，再压枪。</div>
         </div>
         <div id="shotConfirm" data-kind="idle">
           <div id="shotConfirmGlyph"></div>
           <div id="shotConfirmText"></div>
         </div>
         <div id="popups"></div>
-        <div id="killCamText">瀹稿弶绐愬Ч?/div>
+        <div id="killCamText">已淘汰</div>
       </div>
     </div>
   </div>
@@ -2599,7 +2429,8 @@
         far: 200,
         position: new THREE.Vector3(0, 22, 18), // More overhead, centered view
         lookAt: new THREE.Vector3(0, 0, 0),
-        // FPS 濡€崇础闁板秶鐤?        fps: {
+        // FPS 模式配置
+        fps: {
           fov: 75,
           eyeHeight: 1.6,
           pitchMin: -1.15,
@@ -2631,7 +2462,7 @@
       },
       weapons: {
 	        pistol: {
-	          name: '閹靛鐏?,
+	          name: '手枪',
 	          fireRate: 2.1,
 	          fireRateAI: 2.0,
 	          damage: 16,
@@ -2650,7 +2481,7 @@
 	          tracer: 0xffd24d
 	        },
         smg: {
-          name: '閸愭煡鏀遍弸?,
+          name: '冲锋枪',
           fireRate: 10,
           fireRateAI: 6.0,
           damage: 8,
@@ -2669,7 +2500,7 @@
           tracer: 0xf7f7ff
         },
         shotgun: {
-          name: '闂囨澘鑴婇弸?,
+          name: '霰弹枪',
           fireRate: 1.2,
           fireRateAI: 1.0,
           damage: 12,
@@ -2744,10 +2575,10 @@
 	      difficulty: {
 	        order: ['novice', 'easy', 'normal', 'hard'],
 	        labels: {
-	          novice: '閺傜増澧?,
-	          easy: '缁犫偓閸?,
-	          normal: '閺咁噣鈧?,
-	          hard: '閸ヤ即姣?
+	          novice: '新手',
+	          easy: '简单',
+	          normal: '普通',
+	          hard: '困难'
 	        },
 	        byMode: { duel: 'novice', deathmatch: 'easy' }, // 'novice' | 'easy' | 'normal' | 'hard'
 	        presets: {
@@ -2758,17 +2589,18 @@
 	        },
 	        modeOverrides: {
 	          novice: {
-	            deathmatch: { name: '3娴?閺傜増澧滄稊杈ㄦ灍', playerCount: 3, aiCount: 2, lives: 5 }
+	            deathmatch: { name: '3人 新手乱斗', playerCount: 3, aiCount: 2, lives: 5 }
 	          },
 	          easy: {
-	            deathmatch: { name: '4娴?娑旇鲸鏋?, playerCount: 4, aiCount: 3, lives: 4 }
+	            deathmatch: { name: '4人 乱斗', playerCount: 4, aiCount: 3, lives: 4 }
 	          }
 	        }
 	      },
 	      player: {
 	        height: 1.75,
 	        radius: 0.35,
-	        hurtRadius: 0.42, // 閸欐鍤崚銈呯暰閸楀﹤绶?	        headRadius: 0.15  // 閻栧棗銇旈崚銈呯暰閸楀﹤绶為敍鍫滆厬韫囧啫灏崺鐕傜礆
+	        hurtRadius: 0.42, // 受击判定半径
+	        headRadius: 0.15  // 爆头判定半径（中心区域）
 	      },
       match: {
         totalTime: 105,
@@ -2785,8 +2617,8 @@
         skyDropVariance: 5
       },
       gameModes: {
-        duel: { name: '1v1 鐎电懓鍠?, playerCount: 2, arenaScale: 1.0, aiCount: 1, matchType: 'pve' },
-        deathmatch: { name: '4娴?娑旇鲸鏋?, playerCount: 4, arenaScale: 1.3, aiCount: 3, lives: 3, matchType: 'pve' }
+        duel: { name: '1v1 对决', playerCount: 2, arenaScale: 1.0, aiCount: 1, matchType: 'pve' },
+        deathmatch: { name: '4人 乱斗', playerCount: 4, arenaScale: 1.3, aiCount: 3, lives: 3, matchType: 'pve' }
       }
     };
 
@@ -2866,7 +2698,6 @@
 	    const lowHpVignette = document.getElementById('lowHpVignette');
     const dramaticOverlay = document.getElementById('dramaticOverlay');
     const mobileControlsEl = document.getElementById('mobileControls');
-    const mobilePortraitBlockerEl = document.getElementById('mobilePortraitBlocker');
     const mobileLookZoneEl = document.getElementById('mobileLookZone');
     const mobileMovePadEl = document.getElementById('mobileMovePad');
     const mobileMoveThumbEl = document.getElementById('mobileMoveThumb');
@@ -2953,7 +2784,6 @@
       mode: null,
       role: 'player',
       isSpectator: false,
-      isReplay: false,
       team: null,
       seat: null,
       observedUserId: null,
@@ -2964,156 +2794,6 @@
       pendingDash: false,
       pendingWeaponId: null,
       finishedResult: null
-    };
-
-    function installReplayControls() {
-      const style = document.createElement('style');
-      style.textContent = `
-        .pvpReplayHud {
-          position: fixed;
-          top: 18px;
-          right: 18px;
-          z-index: 32;
-          width: min(420px, calc(100vw - 24px));
-          display: grid;
-          gap: 10px;
-          padding: 14px;
-          border-radius: 18px;
-          border: 1px solid rgba(255, 255, 255, 0.12);
-          background: rgba(9, 13, 21, 0.92);
-          box-shadow: 0 18px 34px rgba(0, 0, 0, 0.28);
-          backdrop-filter: blur(12px);
-        }
-        .pvpReplayHud[hidden] {
-          display: none !important;
-        }
-        .pvpReplayHudRow {
-          display: flex;
-          flex-wrap: wrap;
-          gap: 8px;
-          align-items: center;
-        }
-        .pvpReplayHudHead {
-          display: flex;
-          justify-content: space-between;
-          gap: 10px;
-          align-items: flex-start;
-        }
-        .pvpReplayHudHead strong {
-          display: block;
-          font-size: 14px;
-          letter-spacing: 0.06em;
-          text-transform: uppercase;
-          color: #f4f7ff;
-        }
-        .pvpReplayHudHead small,
-        .pvpReplayHudMeta {
-          color: rgba(244, 247, 255, 0.72);
-          line-height: 1.45;
-        }
-        .pvpReplayHud input[type="range"] {
-          flex: 1 1 180px;
-          min-width: 0;
-          accent-color: #7edcff;
-        }
-        .pvpReplayHud label {
-          display: inline-flex;
-          align-items: center;
-          gap: 6px;
-          color: rgba(244, 247, 255, 0.82);
-          font-size: 13px;
-        }
-        .pvpReplayHud select {
-          min-width: 0;
-        }
-        @media (max-width: 720px) {
-          .pvpReplayHud {
-            left: 12px;
-            right: 12px;
-            top: 12px;
-            width: auto;
-          }
-        }
-      `;
-      document.head.appendChild(style);
-
-      const container = document.createElement('div');
-      container.className = 'pvpReplayHud';
-      container.hidden = true;
-      container.innerHTML = `
-        <div class="pvpReplayHudHead">
-          <div>
-            <strong>閻╁瓨鎸卞蹇撴礀閺€?/strong>
-            <small data-replay-title>閸旂姾娴囨稉?..</small>
-          </div>
-          <span class="pvpPlaceholderTag" data-replay-status>閸戝棗顦稉?/span>
-        </div>
-        <div class="pvpReplayHudMeta" data-replay-meta>閸ョ偞鏂侀張顏勬儙閸斻劊鈧?/div>
-        <div class="pvpReplayHudRow">
-          <button class="accountBtn secondary small" type="button" data-replay-prev>-5s</button>
-          <button class="accountBtn" type="button" data-replay-play>閺嗗倸浠?/button>
-          <button class="accountBtn secondary small" type="button" data-replay-next>+5s</button>
-          <button class="accountBtn secondary small" type="button" data-replay-analysis>閸掑棙鐎藉Ο鈥崇础</button>
-          <button class="accountBtn secondary small" type="button" data-replay-close>闁偓閸戝搫娲栭弨?/button>
-        </div>
-        <div class="pvpReplayHudRow">
-          <input type="range" min="0" max="0" step="1" value="0" data-replay-slider />
-          <span class="pvpReplayHudMeta" data-replay-clock>0:00 / 0:00</span>
-        </div>
-        <div class="pvpReplayHudRow">
-          <label>闂€婊冦仈
-            <select class="pvp-input" data-replay-camera>
-              <option value="follow">鐠虹喖娈?/option>
-              <option value="free">閼奉亞鏁?/option>
-            </select>
-          </label>
-          <label>閸婂秹鈧?
-            <select class="pvp-input" data-replay-speed>
-              <option value="0.5">0.5x</option>
-              <option value="1">1x</option>
-              <option value="2">2x</option>
-              <option value="4">4x</option>
-            </select>
-          </label>
-          <label>鐟欏倸鐧?            <select class="pvp-input" data-replay-player>
-              <option value="">鏉炶棄鍙嗘稉?..</option>
-            </select>
-          </label>
-        </div>
-      `;
-      document.body.appendChild(container);
-      return {
-        container,
-        title: container.querySelector('[data-replay-title]'),
-        status: container.querySelector('[data-replay-status]'),
-        meta: container.querySelector('[data-replay-meta]'),
-        play: container.querySelector('[data-replay-play]'),
-        prev: container.querySelector('[data-replay-prev]'),
-        next: container.querySelector('[data-replay-next]'),
-        analysis: container.querySelector('[data-replay-analysis]'),
-        close: container.querySelector('[data-replay-close]'),
-        slider: container.querySelector('[data-replay-slider]'),
-        clock: container.querySelector('[data-replay-clock]'),
-        camera: container.querySelector('[data-replay-camera]'),
-        speed: container.querySelector('[data-replay-speed]'),
-        player: container.querySelector('[data-replay-player]')
-      };
-    }
-
-    const replayControls = installReplayControls();
-    const replayHudState = {
-      active: false,
-      loading: false,
-      playing: false,
-      finished: false,
-      matchId: null,
-      mode: null,
-      playheadSeconds: 0,
-      durationSeconds: 0,
-      speed: 1,
-      cameraMode: 'follow',
-      observedUserId: null,
-      players: []
     };
 
 	    const settings = {
@@ -3175,8 +2855,8 @@
       combatFeedKind: 'idle',
       combatFeedSeverity: 'calm',
       combatFeedEmphasis: 'standard',
-      combatFeedLabel: '閹存ê婧€缁嬪啿鐣?,
-      combatFeedMeta: '閸忓牐顫囩€电噦绱濋崘宥呭竾閺嬵亗鈧?,
+      combatFeedLabel: '战场稳定',
+      combatFeedMeta: '先观察，再压枪。',
       combatFeedLift: 8,
       combatFeedScale: 1,
       combatPulseTimer: 0,
@@ -3326,7 +3006,7 @@
       updateAimSettingsUI();
 
       if (!options.silent) {
-        showBanner(`閻嫬鍣悘鍨櫛鎼?${formatFpsSensitivity(nextScale)}`, { skipFeedback: true });
+        showBanner(`瞄准灵敏度 ${formatFpsSensitivity(nextScale)}`, { skipFeedback: true });
       }
     }
 
@@ -3443,7 +3123,7 @@
 
       pvpPlaceholderRefreshBtn?.addEventListener('click', async () => {
         if (!window.shootersPvp?.refresh) {
-          showBanner('PVP 闂堛垺婢樻潻妯烘躬閸旂姾娴囬敍宀冾嚞缁嬪秴鎮楅崘宥堢槸閵?, { skipFeedback: true });
+          showBanner('PVP 面板还在加载，请稍后再试。', { skipFeedback: true });
           return;
         }
 
@@ -3461,7 +3141,7 @@
 
       pvpPlaceholderLeaveBtn?.addEventListener('click', async () => {
         if (!window.shootersPvp?.surrenderMatch) {
-          showBanner('PVP 闂堛垺婢樻潻妯烘躬閸旂姾娴囬敍宀冾嚞缁嬪秴鎮楅崘宥堢槸閵?, { skipFeedback: true });
+          showBanner('PVP 面板还在加载，请稍后再试。', { skipFeedback: true });
           return;
         }
         window.shootersPvp.surrenderMatch();
@@ -3487,67 +3167,13 @@
         finishLivePvpMatch(event.detail || null, true);
       });
 
-      replayControls.play?.addEventListener('click', () => {
-        if (!window.shootersReplaySpectate) return;
-        if (replayHudState.finished) {
-          window.shootersReplaySpectate.restart?.();
-          return;
-        }
-        window.shootersReplaySpectate.togglePlayback?.();
-      });
-      replayControls.prev?.addEventListener('click', () => {
-        window.shootersReplaySpectate?.seek?.((replayHudState.playheadSeconds || 0) - 5);
-      });
-      replayControls.next?.addEventListener('click', () => {
-        window.shootersReplaySpectate?.seek?.((replayHudState.playheadSeconds || 0) + 5);
-      });
-      replayControls.analysis?.addEventListener('click', () => {
-        window.shootersReplaySpectate?.openAnalysisMode?.();
-      });
-      replayControls.close?.addEventListener('click', () => {
-        window.shootersReplaySpectate?.close?.();
-      });
-      replayControls.slider?.addEventListener('input', (event) => {
-        window.shootersReplaySpectate?.seek?.(Number(event.target.value || 0) / 10);
-      });
-      replayControls.camera?.addEventListener('change', (event) => {
-        window.shootersReplaySpectate?.setCameraMode?.(event.target.value);
-      });
-      replayControls.speed?.addEventListener('change', (event) => {
-        window.shootersReplaySpectate?.setSpeed?.(Number(event.target.value || 1));
-      });
-      replayControls.player?.addEventListener('change', (event) => {
-        window.shootersReplaySpectate?.setObservedUser?.(event.target.value || '');
-      });
-
-      window.addEventListener('shooters-pvp-replay-state', (event) => {
-        Object.assign(replayHudState, event.detail || {});
-        renderReplayControls();
-        if (replayHudState.active && livePvp.isReplay) {
-          setReplayObservedUser(replayHudState.observedUserId, { skipCameraSync: true });
-          applyReplayCameraMode(replayHudState.cameraMode);
-        }
-      });
-
-      window.addEventListener('shooters-pvp-replay-seeked', () => {
-        clearReplayTransientVisuals();
-      });
-
-      window.addEventListener('shooters-pvp-replay-closed', () => {
-        replayHudState.active = false;
-        replayHudState.loading = false;
-        replayHudState.finished = false;
-        renderReplayControls();
-        teardownReplaySpectate();
-      });
-
       window.addEventListener('shooters-pvp-state-changed', (event) => {
         const currentMatch = event.detail?.currentMatch || null;
         if (currentMatch?.matchId && state.mode === 'menu' && !livePvp.active) {
           showBanner(
             currentMatch.role === 'spectator'
-              ? '濡偓濞村鍩岄崣顖滄埛缂侇厾娈?PVP 鐟欏倽绂岄敍灞绢劀閸︺劍浠径宥冣偓?
-              : '濡偓濞村鍩岄崣顖炲櫢鏉╃偟娈戦崷銊у殠 PVP 鐎电懓鐪敍灞绢劀閸︺劍浠径宥冣偓?,
+              ? '检测到可继续的 PVP 观赛，正在恢复。'
+              : '检测到可重连的在线 PVP 对局，正在恢复。',
             { skipFeedback: true }
           );
         }
@@ -3666,7 +3292,7 @@
       const skipPointerLock = Boolean(options.skipPointerLock || mobileState.active);
 
       if (mode === 'fps') {
-        // 鏉╂稑鍙?FPS閿涙艾鐨剧拠鏇㈡敚鐎规岸绱堕弽鍥モ偓渚€娈ｉ挊蹇曞负鐎硅埖膩閸ㄥ鈧線娈ｉ挊蹇撴勾闂堛垹鍣弰鐔粹偓浣规▔缁€鍝勫磩鐎涙鍣弰?
+        // 进入 FPS：尝试锁定鼠标、隐藏玩家模型、隐藏地面准星、显示十字准星
         if (!skipPointerLock) {
           requestPointerLockSafely();
         }
@@ -3675,14 +3301,14 @@
         if (crosshair) crosshair.style.display = 'block';
         state.fpsPitch = 0;
       } else {
-        // 閸ョ偛鍩屾穱顖濐潒閿涙俺袙闁夸線绱堕弽鍥モ偓浣规▔缁€铏瑰负鐎硅埖膩閸ㄥ鈧焦妯夌粈鍝勬勾闂堛垹鍣弰鐔粹偓渚€娈ｉ挊蹇撳磩鐎涙鍣弰?
+        // 回到俯视：解锁鼠标、显示玩家模型、显示地面准星、隐藏十字准星
         if (!skipPointerLock && document.pointerLockElement === canvas) {
           document.exitPointerLock();
         }
         if (player && player.root) player.root.visible = true;
         if (world.reticle) world.reticle.visible = true;
         if (crosshair) crosshair.style.display = 'none';
-        // 閹垹顦查惄鍛婃簚閸掍即绮拋銈勫垔鐟欏棔缍呯純?
+        // 恢复相机到默认俯视位置
         world.camera.fov = CONFIG.camera.fov;
         world.camera.updateProjectionMatrix();
       }
@@ -3709,7 +3335,7 @@
 	          if (isAnyPlayingMode()) toggleViewMode();
 	        }
 	        if (event.code === 'Escape' || event.code === 'KeyP') {
-	          // FPS 濡€崇础娑?Esc 閸忓牆鍨忛崶鐐板垔鐟欏棴绱濇稉宥嗘畯閸?
+	          // FPS 模式下 Esc 先切回俯视，不暂停
 	          if (event.code === 'Escape' && state.viewMode === 'fps') {
 	            setViewMode('topdown');
 	          } else {
@@ -3762,7 +3388,7 @@
         input.mouse.down = true;
         input.mouse.justPressed = true;
         updatePointer(event);
-        // FPS 濡€崇础娑撳鍋ｉ崙鑽ゆ暰鐢啳鍤滈崝銊嚞濮?Pointer Lock
+        // FPS 模式下点击画布自动请求 Pointer Lock
         if (state.viewMode === 'fps' && document.pointerLockElement !== canvas && isAnyPlayingMode()) {
           requestPointerLockSafely();
         }
@@ -3778,15 +3404,16 @@
         updatePointer(event);
       });
 
-      // FPS Pointer Lock 閻╂垵鎯?      document.addEventListener('pointerlockchange', () => {
+      // FPS Pointer Lock 监听
+      document.addEventListener('pointerlockchange', () => {
         if (mobileState.active) return;
         if (document.pointerLockElement !== canvas && state.viewMode === 'fps') {
-          // 閻劍鍩涢幐?Esc 闁偓閸戣桨绨?Pointer Lock閿涘矁鍤滈崝銊ュ瀼閸ョ偘鍒婄憴?
+          // 用户按 Esc 退出了 Pointer Lock，自动切回俯视
           setViewMode('topdown');
         }
       });
 
-      // FPS 姒х姵鐖ｇ粔璇插З 閳?yaw/pitch
+      // FPS 鼠标移动 → yaw/pitch
       if (SUPPORTS_POINTER_RAW_UPDATE) {
         window.addEventListener('pointerrawupdate', (event) => {
           if (isMobilePointerEvent(event) || isMobileControlTarget(event.target)) return;
@@ -3805,7 +3432,8 @@
 
     function updatePointer(event) {
       if (isMobilePointerEvent(event)) return;
-      if (state.viewMode === 'fps') return; // FPS 娑撳绗夌挧?raycaster 鐎规矮缍?      const rect = canvas.getBoundingClientRect();
+      if (state.viewMode === 'fps') return; // FPS 下不走 raycaster 定位
+      const rect = canvas.getBoundingClientRect();
       input.mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
       input.mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
     }
@@ -5075,10 +4703,10 @@
       const mode = getActiveGameMode();
       const spawnPoints = getSpawnPoints(mode.playerCount);
       const roster = [
-        { id: 'p1', name: '閻溾晛顔?1 (缂?', team: 'p1', color: COLORS.p1, path: playerPath, isPlayer: true },
-        { id: 'p2', name: '閻溾晛顔?2 (缁?', team: 'p2', color: COLORS.p2, path: enemyPath, isPlayer: false },
-        { id: 'p3', name: '閻溾晛顔?3 (閽?', team: 'p3', color: COLORS.p3, path: enemyPath, isPlayer: false },
-        { id: 'p4', name: '閻溾晛顔?4 (闁?', team: 'p4', color: COLORS.p4, path: enemyPath, isPlayer: false }
+        { id: 'p1', name: '玩家 1 (绿)', team: 'p1', color: COLORS.p1, path: playerPath, isPlayer: true },
+        { id: 'p2', name: '玩家 2 (红)', team: 'p2', color: COLORS.p2, path: enemyPath, isPlayer: false },
+        { id: 'p3', name: '玩家 3 (蓝)', team: 'p3', color: COLORS.p3, path: enemyPath, isPlayer: false },
+        { id: 'p4', name: '玩家 4 (金)', team: 'p4', color: COLORS.p4, path: enemyPath, isPlayer: false }
       ];
 
       roster.slice(0, mode.playerCount).forEach((entry, index) => {
@@ -5406,7 +5034,7 @@
     }
 
     function updateBestTimeUI() {
-      const bestText = `閺堚偓韫囶偉骞忛懗婊勬闂? ${formatTime(state.bestWinTime)}`;
+      const bestText = `最快获胜时间: ${formatTime(state.bestWinTime)}`;
       bestTimeEl.textContent = bestText;
       bestTimeEnd.textContent = bestText;
     }
@@ -5491,7 +5119,7 @@
 	      if (difficultyLabelEl) {
 	        const modeName = getEffectiveGameMode(state.gameMode)?.name || state.gameMode;
 	        const label = getDifficultyLabel(current);
-	        difficultyLabelEl.textContent = `${modeName} AI 闂呮儳瀹抽敍?{label}`;
+	        difficultyLabelEl.textContent = `${modeName} AI 难度：${label}`;
 	      }
       if (menuDifficultyStatEl) {
         menuDifficultyStatEl.textContent = getDifficultyLabel(current);
@@ -5524,16 +5152,16 @@
       if (state.gameMode === 'deathmatch') {
         const dm = getEffectiveGameMode('deathmatch');
         modeSubtitleEl.textContent = currentDifficulty === 'novice'
-          ? '閺囨潙顔旈弶鍓ф畱娑旇鲸鏋熺紒鍐х瘎閸︾尨绱濋崗鍫㈠暃閹铔嬫担宥冣偓浣瑰床瀵懓鎷伴悥鍡欏仮濡楁儼濡總蹇嬧偓?
+          ? '更宽松的乱斗练习场，先熟悉走位、换弹和爆炸桶节奏。'
           : currentDifficulty === 'easy'
-            ? '娣囨繄鏆€娑旇鲸鏋熼悜顓㈡閹扮噦绱濇担鍡樺Ω閻㈢喎鎳￠崪?AI 閸樺濮忔稉瀣殶娑撯偓濡楋絻鈧?
-            : '婢舵矮姹夊ǎ閿嬪灛缁旂偞濡ч崷鐚寸礉濞茶鍩岄張鈧崥搴ｆ畱鐟欐帟澹婇懢鐤劏閵?;
-        modeRulesEl.textContent = `${dm.playerCount} 閸氬秷顫楅懝?璺?${dm.lives} 閺夆€虫嚒 璺?1:45 閺冨爼妫块梽鎰煑 璺?瑜版挸澧?AI閿?{difficultyLabel}`;
+            ? '保留乱斗热闹感，但把生命和 AI 压力下调一档。'
+            : '多人混战竞技场，活到最后的角色获胜。';
+        modeRulesEl.textContent = `${dm.playerCount} 名角色 · ${dm.lives} 条命 · 1:45 时间限制 · 当前 AI：${difficultyLabel}`;
       } else {
         modeSubtitleEl.textContent = currentDifficulty === 'novice'
-          ? '閺囧瓨鍙冮妴浣规纯閸戝棎鈧焦娲跨€硅棄顔愰惃?1v1閿涘苯顕粭顑跨濞嗏€茬瑐閹靛娲块崣瀣偨閵?
-          : '瀵邦喖鐎风粩鐐村Η閸?1v1閿涘苯顕弸顏囧Ν婵傚繑绔婚弲甯礉闁倸鎮庨柅鎰劄閹绘劙姣﹂妴?;
-        modeRulesEl.textContent = `娴滄柨鐪稉澶庡劏 璺?1:45 閺冨爼妫块梽鎰煑 璺?閻栧棛鍋㈠璺哄蓟閺傚湱鏁撻弫?璺?瑜版挸澧?AI閿?{difficultyLabel}`;
+          ? '更慢、更准、更宽容的 1v1，对第一次上手更友好。'
+          : '微型竞技场 1v1，对枪节奏清晰，适合逐步提难。';
+        modeRulesEl.textContent = `五局三胜 · 1:45 时间限制 · 爆炸桶双方生效 · 当前 AI：${difficultyLabel}`;
       }
     }
 
@@ -5581,12 +5209,13 @@
       }
       if (isAnyPlayingMode(mode)) {
         hideBanner({ suppressOnly: false });
-        // 鏉╂稑鍙嗗〒鍛婂灆閺冩儼鍤滈崝銊ュ瀼閹广垹鍩?FPS 鐟欏棜顫?        if (state.viewMode !== 'fps') setViewMode('fps');
+        // 进入游戏时自动切换到 FPS 视角
+        if (state.viewMode !== 'fps') setViewMode('fps');
       }
       if (mode === 'menu' || mode === 'matchOver' || mode === 'pvpPlaceholder') {
         clearShotFeedback();
         resetShotFeedbackHistory();
-        // 閼挎粌宕?閸栧綊鍘ょ紒鎾存将閺冭泛宸遍崚璺哄瀼閸ョ偘鍒婄憴?
+        // 菜单/匹配结束时强制切回俯视
         if (state.viewMode === 'fps') setViewMode('topdown');
       }
       if (mode === 'menu') {
@@ -5598,128 +5227,8 @@
       updateMobileActionState(getPlayer());
     }
 
-    function formatReplayClock(seconds) {
-      const safeSeconds = Math.max(0, Number(seconds) || 0);
-      const minutes = Math.floor(safeSeconds / 60);
-      const remainSeconds = Math.floor(safeSeconds % 60);
-      return `${minutes}:${String(remainSeconds).padStart(2, '0')}`;
-    }
-
-    function renderReplayControls() {
-      const players = Array.isArray(replayHudState.players) ? replayHudState.players : [];
-      replayControls.container.hidden = !replayHudState.active && !replayHudState.finished && !replayHudState.loading;
-      if (replayControls.container.hidden) {
-        return;
-      }
-
-      replayControls.title.textContent = replayHudState.matchId
-        ? `${replayHudState.mode === 'deathmatch' ? '4娴滆桨璐￠弬? : '1v1 鐎电懓鍠?} 璺?${String(replayHudState.matchId).slice(0, 8)}`
-        : '閻╁瓨鎸卞蹇撴礀閺€?;
-      replayControls.status.textContent = replayHudState.loading
-        ? '鏉炶棄鍙嗘稉?
-        : (replayHudState.finished ? '瀹歌尙绮ㄩ弶? : (replayHudState.playing ? '閹绢厽鏂佹稉? : '瀹稿弶娈忛崑?));
-      replayControls.meta.textContent = replayHudState.loading
-        ? '濮濓絽婀潪钘夊弳閸ョ偞鏂侀崘鍛啇楠炶泛鍨忛幑銏犲煂閻╁瓨鎸卞蹇氼潎閹存ǜ鈧?
-        : `鐟欏倸鐧?${players.length || 0} 閸氬秶甯虹€?璺?${replayHudState.cameraMode === 'free' ? '閼奉亞鏁遍梹婊冦仈' : '鐠虹喖娈㈤梹婊冦仈'}`;
-      replayControls.play.textContent = replayHudState.finished ? '闁插秵鎸? : (replayHudState.playing ? '閺嗗倸浠? : '閹绢厽鏂?);
-      replayControls.slider.max = String(Math.max(0, Math.round((replayHudState.durationSeconds || 0) * 10)));
-      replayControls.slider.value = String(Math.round((replayHudState.playheadSeconds || 0) * 10));
-      replayControls.slider.disabled = replayHudState.loading;
-      replayControls.clock.textContent =
-        `${formatReplayClock(replayHudState.playheadSeconds)} / ${formatReplayClock(replayHudState.durationSeconds)}`;
-      replayControls.camera.value = replayHudState.cameraMode === 'free' ? 'free' : 'follow';
-      replayControls.speed.value = String(replayHudState.speed || 1);
-      if (players.length) {
-        replayControls.player.replaceChildren(
-          ...players.map((player) => {
-            const option = document.createElement('option');
-            option.value = String(player.userId || '');
-            option.textContent = player.displayName || player.username || option.value || 'Player';
-            option.selected = option.value === String(replayHudState.observedUserId || '');
-            return option;
-          })
-        );
-      } else {
-        const option = document.createElement('option');
-        option.value = '';
-        option.textContent = '鏉炶棄鍙嗘稉?..';
-        replayControls.player.replaceChildren(option);
-      }
-    }
-
-    function clearReplayTransientVisuals() {
-      clearShotFeedback();
-      resetShotFeedbackHistory();
-      suddenDeathEl.classList.remove('show');
-      world.entities.forEach((entity) => {
-        if (entity?.muzzle) {
-          entity.muzzle.visible = false;
-          entity.muzzle.life = 0;
-        }
-      });
-    }
-
-    function applyReplayCameraMode(mode = replayHudState.cameraMode) {
-      replayHudState.cameraMode = mode === 'free' ? 'free' : 'follow';
-      if (!livePvp.isReplay) return;
-      if (replayHudState.cameraMode === 'free') {
-        if (state.viewMode === 'fps') {
-          setViewMode('topdown');
-        }
-      } else if (state.viewMode !== 'fps') {
-        setViewMode('fps');
-      }
-    }
-
-    function setReplayObservedUser(userId, options = {}) {
-      if (!livePvp.active || !livePvp.isReplay || !world.entities.length) return false;
-      const targetEntity =
-        world.entities.find((entity) => String(entity.userId) === String(userId || '')) ||
-        world.entities.find((entity) => String(entity.userId) === String(livePvp.observedUserId || '')) ||
-        world.entities[0] ||
-        null;
-      if (!targetEntity) return false;
-
-      world.entities.forEach((entity) => {
-        entity.isPlayer = entity === targetEntity;
-        entity.root.visible = !(entity.isPlayer && state.viewMode === 'fps');
-      });
-      livePvp.observedUserId = targetEntity.userId || null;
-      replayHudState.observedUserId = livePvp.observedUserId;
-      updateHUD();
-      if (!options.skipCameraSync) {
-        applyReplayCameraMode(replayHudState.cameraMode);
-      }
-      return true;
-    }
-
-    function teardownReplaySpectate() {
-      livePvp.active = false;
-      livePvp.matchId = null;
-      livePvp.mode = null;
-      livePvp.role = 'player';
-      livePvp.isSpectator = false;
-      livePvp.isReplay = false;
-      livePvp.team = null;
-      livePvp.seat = null;
-      livePvp.observedUserId = null;
-      livePvp.snapshot = null;
-      livePvp.previousSnapshot = null;
-      livePvp.lastSnapshotAt = 0;
-      livePvp.pendingReload = false;
-      livePvp.pendingDash = false;
-      livePvp.pendingWeaponId = null;
-      livePvp.finishedResult = null;
-      state.pvpLiveFinished = false;
-      state.matchEnded = false;
-      suddenDeathEl.classList.remove('show');
-      clearReplayTransientVisuals();
-      applyGameMode(state.gameMode || 'duel');
-      setMode('menu');
-    }
-
     function formatPvpPlaceholderMode(mode) {
-      return mode === 'deathmatch' ? '4娴滆桨璐￠弬? : '1v1 鐎电懓鍠?;
+      return mode === 'deathmatch' ? '4人乱斗' : '1v1 对决';
     }
 
     function buildPvpPlaceholderPlayerRow(player) {
@@ -5736,7 +5245,7 @@
       const tagWrap = document.createElement('div');
       const tag = document.createElement('span');
       tag.className = 'pvpPlaceholderTag';
-      tag.textContent = player?.isHost ? '閹村じ瀵? : '閹存劕鎲?;
+      tag.textContent = player?.isHost ? '房主' : '成员';
       tagWrap.appendChild(tag);
 
       item.append(identity, tagWrap);
@@ -5750,9 +5259,9 @@
 
       const placeholder = state.pvpPlaceholder;
       if (!placeholder) {
-        pvpPlaceholderTitleEl.textContent = 'PVP 閹村潡妫垮鑼矋婵?;
-        pvpPlaceholderMetaEl.textContent = '閹村潡妫块崪宀€甯虹€规湹绗傛稉瀣瀮瀹歌弓绻氶悾娆欑礉閻喐顒滈崷銊у殠閸氬本顒為幋妯绘灍娴兼艾婀稉瀣╃闂冭埖顔岄幒銉ュ弳閵?;
-        pvpPlaceholderHintEl.textContent = '瑜版挸澧犻弰顖氬窗娴ｅ秴绱戦幋妯荤ウ缁嬪绱版稉宥勭窗鏉╂稑鍙嗛張顒€婀?PVE閿涘奔绡冩稉宥勭窗鐟欙箑褰傜€广垺鍩涚粩顖濆殰閹躲儱绱＄紒鎾剁暬閵?;
+        pvpPlaceholderTitleEl.textContent = 'PVP 房间已组好';
+        pvpPlaceholderMetaEl.textContent = '房间和玩家上下文已保留，真正在线同步战斗会在下一阶段接入。';
+        pvpPlaceholderHintEl.textContent = '当前是占位开战流程：不会进入本地 PVE，也不会触发客户端自报式结算。';
         pvpPlaceholderRosterEl.replaceChildren();
         return;
       }
@@ -5760,13 +5269,13 @@
       const players = Array.isArray(placeholder.players) ? placeholder.players : [];
       const startedAtLabel = placeholder.startedAt
         ? new Date(placeholder.startedAt).toLocaleString()
-        : '閸掓艾鍨?;
-      pvpPlaceholderTitleEl.textContent = `${formatPvpPlaceholderMode(placeholder.mode)} 瀹歌尪绻橀崗銉ュ窗娴ｅ秴绱戦幋姒?
+        : '刚刚';
+      pvpPlaceholderTitleEl.textContent = `${formatPvpPlaceholderMode(placeholder.mode)} 已进入占位开战`;
       pvpPlaceholderMetaEl.textContent =
-        `閹村潡妫块惍?${placeholder.roomCode || '-'} 璺?閹村潡妫?ID ${placeholder.roomId || '-'} 璺?` +
-        `閻溾晛顔嶉弫?${players.length} 璺?瀵偓婵妞傞梻?${startedAtLabel}`;
+        `房间码 ${placeholder.roomCode || '-'} · 房间 ID ${placeholder.roomId || '-'} · ` +
+        `玩家数 ${players.length} · 开始时间 ${startedAtLabel}`;
       pvpPlaceholderHintEl.textContent =
-        '瑜版挸澧犻梼鑸殿唽閸欘亙绻氶悾娆愬煣闂傛番鈧焦膩瀵繐鎷伴悳鈺侇啀娑撳﹣绗呴弬鍥风礉閸氬海鐢婚幒銉ュ弳閺堝秴濮熺粩顖涙綀婵炰礁婀痪鎸庡灛閺傛妞傛导姘辨纯閹恒儱顦查悽銊ㄧ箹闁插瞼娈戦弫鐗堝祦閵?;
+        '当前阶段只保留房间、模式和玩家上下文，后续接入服务端权威在线战斗时会直接复用这里的数据。';
       pvpPlaceholderRosterEl.replaceChildren(...players.map((player) => buildPvpPlaceholderPlayerRow(player)));
     }
 
@@ -5803,7 +5312,7 @@
       renderPvpPlaceholderOverlay();
 
       if (options.forceOpen || (isNewPlaceholder && !state.pvpPlaceholderDismissed)) {
-        showBanner('PVP 閹村潡妫垮鑼矋婵傛枻绱濇潻娑樺弳閸楃姳缍呭鈧幋妯糕偓?, { skipFeedback: true });
+        showBanner('PVP 房间已组好，进入占位开战。', { skipFeedback: true });
         setMode('pvpPlaceholder');
       }
     }
@@ -6067,7 +5576,6 @@
 
     function startLivePvpMatch(payload) {
       if (!payload?.snapshot) return;
-      const replayInfo = payload.replay && typeof payload.replay === 'object' ? payload.replay : null;
 
       state.gameMode = payload.mode || 'duel';
       state.activeGameMode = state.gameMode;
@@ -6083,16 +5591,11 @@
       const liveRole = payload.role || livePvp.role || 'player';
       const localTeam = liveRole === 'spectator' ? null : (payload.team || livePvp.team);
       world.entities = players.map((player, index) => buildLivePvpEntity(player, index, localTeam));
-      let observedEntity =
-        world.entities.find((entity) => String(entity.userId) === String(replayInfo?.observedUserId || '')) ||
-        world.entities.find((entity) => entity.isPlayer) ||
-        null;
+      let observedEntity = world.entities.find((entity) => entity.isPlayer) || null;
       if (!observedEntity && world.entities.length) {
         observedEntity = world.entities[0];
+        observedEntity.isPlayer = true;
       }
-      world.entities.forEach((entity) => {
-        entity.isPlayer = entity === observedEntity;
-      });
       world.mixers = world.entities.map((entity) => entity.mixers).filter(Boolean);
       setupHUD();
 
@@ -6101,7 +5604,6 @@
       livePvp.mode = payload.mode || payload.snapshot.mode || 'duel';
       livePvp.role = liveRole;
       livePvp.isSpectator = liveRole === 'spectator';
-      livePvp.isReplay = Boolean(replayInfo?.active);
       livePvp.team = livePvp.isSpectator ? null : (payload.team || null);
       livePvp.seat = livePvp.isSpectator ? null : (payload.seat ?? null);
       livePvp.observedUserId = observedEntity?.userId || null;
@@ -6116,13 +5618,11 @@
       syncPvpPlaceholderState(null);
       syncLivePvpScore(payload.snapshot);
       setMode('pvpPlaying');
-      applyReplayCameraMode(replayInfo?.cameraMode || replayHudState.cameraMode);
-      setReplayObservedUser(replayInfo?.observedUserId || livePvp.observedUserId, { skipCameraSync: true });
       applyLivePvpSnapshot();
       showBanner(
         livePvp.isSpectator
-          ? `瀹歌尪绻橀崗?${getModeLabel(livePvp.mode)} 鐟欏倽绂宍
-          : `瀹歌尪绻橀崗?${getModeLabel(livePvp.mode)} 閸︺劎鍤庣€电懓鐪琡,
+          ? `已进入 ${getModeLabel(livePvp.mode)} 观赛`
+          : `已进入 ${getModeLabel(livePvp.mode)} 在线对局`,
         { skipFeedback: true }
       );
     }
@@ -6137,13 +5637,6 @@
       livePvp.previousSnapshot = livePvp.snapshot || payload;
       livePvp.snapshot = payload;
       livePvp.lastSnapshotAt = performance.now();
-      if (payload.replay?.active) {
-        livePvp.isReplay = true;
-        replayHudState.observedUserId = payload.replay?.observedUserId || replayHudState.observedUserId;
-        replayHudState.cameraMode = payload.replay?.cameraMode || replayHudState.cameraMode;
-        setReplayObservedUser(replayHudState.observedUserId, { skipCameraSync: true });
-        applyReplayCameraMode(replayHudState.cameraMode);
-      }
     }
 
     function handleLivePvpEvent(payload) {
@@ -6234,7 +5727,7 @@
 
       if (event.type === 'kill') {
         if (target) {
-          spawnPopup('閸戠粯娼?, target.position.clone().add(new THREE.Vector3(0, 1.8, 0)), 'close', 0.9);
+          spawnPopup('击杀', target.position.clone().add(new THREE.Vector3(0, 1.8, 0)), 'close', 0.9);
         }
         if (attacker && localPlayer && attacker === localPlayer) {
           presentCombatFeedback({
@@ -6251,19 +5744,19 @@
       }
 
       if (event.type === 'round_start') {
-        showBanner(`缁?${event.round || state.round} 閸ョ偛鎮庡鈧慨濯? { skipFeedback: true });
+        showBanner(`第 ${event.round || state.round} 回合开始`, { skipFeedback: true });
         return;
       }
 
       if (event.type === 'round_end') {
         state.roundResults.push(event.winnerTeam);
         updateRoundPips();
-        showBanner(`閺堫剙娲栭崥?${event.winnerTeam || '-'} 閼剧柉鍎╜, { skipFeedback: true });
+        showBanner(`本回合 ${event.winnerTeam || '-'} 获胜`, { skipFeedback: true });
         return;
       }
 
       if (event.type === 'respawn') {
-        showBanner('閺堝姹夊鏌ュ櫢閻?, { skipFeedback: true });
+        showBanner('有人已重生', { skipFeedback: true });
         return;
       }
 
@@ -6277,13 +5770,11 @@
       if (!livePvp.active && !result) return;
 
       const wasSpectating = (result?.role || livePvp.role) === 'spectator';
-      const wasReplay = Boolean(result?.replay?.active || livePvp.isReplay);
       livePvp.active = false;
       livePvp.matchId = null;
       livePvp.finishedResult = result || null;
       livePvp.role = 'player';
       livePvp.isSpectator = false;
-      livePvp.isReplay = false;
       livePvp.team = null;
       livePvp.seat = null;
       livePvp.observedUserId = null;
@@ -6296,39 +5787,23 @@
       state.lastMatchSummary = null;
       state.matchEnded = true;
 
-      if (wasReplay) {
-        const winner = result?.stats?.find((entry) => entry.won) || null;
-        const winnerName = winner?.displayName || winner?.username || result?.winnerTeam || '閺堫亞鐓￠悳鈺侇啀';
-        const mvp = result?.stats?.find((entry) => String(entry.userId) === String(result?.mvpUserId)) || null;
-        matchTitle.textContent = aborted ? '閸ョ偞鏂佸鏌モ偓鈧崙? : '閸ョ偞鏂佺紒鎾存将';
-        matchStats.textContent = aborted
-          ? '瀹告煡鈧偓閸戣櫣娲块幘顓炵础閸ョ偞鏂侀妴?
-          : `閼虫粏鈧?${winnerName} 璺?MVP: ${mvp?.displayName || mvp?.username || '閺?}`;
-        if (touchRestartBtn) {
-          touchRestartBtn.textContent = '闁插秵鏌婇幘顓熸杹';
-        }
-        bestTimeEnd.textContent = '鏉╂瑦妲搁崶鐐存杹閿涘奔绗夌憴锕€褰傛禒璁崇秿婵傛牕濮抽妴?;
-        setMode('matchOver');
-        return;
-      }
-
       if (aborted) {
-        matchTitle.textContent = wasSpectating ? '鐟欏倽绂屽韫厬閺? : '閸︺劎鍤?PVP 鐎电懓鐪韫厬閺?;
+        matchTitle.textContent = wasSpectating ? '观赛已中断' : '在线 PVP 对局已中断';
         matchStats.textContent = wasSpectating
-          ? '閺堝秴濮熼崳銊よ厬閺傤厽鍨ㄩ幋鍧楁？瀵倸鐖堕崗鎶芥４閿涘矁绻栭崷楦款潎鐠ф稑鍑＄紒鎾存将閵?
-          : '閺堝秴濮熼崳銊よ厬閺傤厽鍨ㄩ幋鍧楁？瀵倸鐖堕崗鎶芥４閿涘本婀扮仦鈧稉宥勭窗閼奉亜濮╅崣鎴犵垳閵?;
+          ? '服务器中断或房间异常关闭，这场观赛已结束。'
+          : '服务器中断或房间异常关闭，本局不会自动发码。';
       } else {
         const winner = result?.stats?.find((entry) => entry.won) || null;
-        const winnerName = winner?.displayName || winner?.username || result?.winnerTeam || '閺堫亞鐓￠悳鈺侇啀';
+        const winnerName = winner?.displayName || winner?.username || result?.winnerTeam || '未知玩家';
         const mvp = result?.stats?.find((entry) => String(entry.userId) === String(result?.mvpUserId)) || null;
-        matchTitle.textContent = wasSpectating ? '鐟欏倽绂岀紒鎾存将' : `${winnerName} 閼剧柉鍎╜;
+        matchTitle.textContent = wasSpectating ? '观赛结束' : `${winnerName} 获胜`;
         matchStats.textContent = wasSpectating
-          ? `閺堫剙婧€閼虫粏鈧? ${winnerName} 璺?MVP: ${mvp?.displayName || mvp?.username || '閺?}`
-          : `閸︺劎鍤?PVP 瀹歌尙绮ㄩ弶?璺?MVP: ${mvp?.displayName || mvp?.username || '閺?} 璺?娑撳秷袝閸欐垼鍤滈崝銊ュ絺閻梗;
+          ? `本场胜者: ${winnerName} · MVP: ${mvp?.displayName || mvp?.username || '无'}`
+          : `在线 PVP 已结束 · MVP: ${mvp?.displayName || mvp?.username || '无'} · 不触发自动发码`;
       }
       bestTimeEnd.textContent = wasSpectating
-        ? '瑜版挸澧犻崣顏呮Ц鐟欏倽绂岄敍灞肩瑝鐟欙箑褰傛禒璁崇秿婵傛牕濮抽妴?
-        : '閸︺劎鍤?PVP 婵傛牕濮虫禒宥勭箽閹镐礁鍙ч梻顓ㄧ礉閸欘亣顔囪ぐ鏇熸綀婵炰礁顕仦鈧崢鍡楀蕉閵?;
+        ? '当前只是观赛，不触发任何奖励。'
+        : '在线 PVP 奖励仍保持关闭，只记录权威对局历史。';
       setMode('matchOver');
     }
 
@@ -6404,10 +5879,6 @@
 
     function startMatch() {
       if (state.pvpLiveFinished) {
-        if (livePvp.finishedResult?.replay?.active && window.shootersReplaySpectate?.restart) {
-          window.shootersReplaySpectate.restart();
-          return;
-        }
         state.pvpLiveFinished = false;
         livePvp.finishedResult = null;
         setMode('menu');
@@ -6456,7 +5927,7 @@
 	      world.skyDropTimer = CONFIG.pickups.skyDropInterval;
 	      updateRoundPips();
 	      setMode('roundIntro');
-      showBanner(state.gameMode === 'deathmatch' ? '閼奉亞鏁辨稊杈ㄦ灍 璺?瀵偓婵绱? : `缁?${state.round} 閸ョ偛鎮?璺?瀵偓婵绱抈);
+      showBanner(state.gameMode === 'deathmatch' ? '自由乱斗 · 开始！' : `第 ${state.round} 回合 · 开始！`);
       setTimeout(() => {
         if (state.mode === 'roundIntro') {
           setMode('playing');
@@ -6721,8 +6192,8 @@
 
     function getDangerLabel(kind) {
       const severity = kind || 'calm';
-      if (severity === 'calm') return '閹存ê婧€缁嬪啿鐣?;
-      return getDangerSeverityConfig(state.gameMode, severity)?.badgeLabel || '閹存ê婧€缁嬪啿鐣?;
+      if (severity === 'calm') return '战场稳定';
+      return getDangerSeverityConfig(state.gameMode, severity)?.badgeLabel || '战场稳定';
     }
 
     function getLayerSeverityRank(layer, severity) {
@@ -6899,8 +6370,8 @@
       fx.combatFeedKind = 'idle';
       fx.combatFeedSeverity = 'calm';
       fx.combatFeedEmphasis = 'standard';
-      fx.combatFeedLabel = '閹存ê婧€缁嬪啿鐣?;
-      fx.combatFeedMeta = '閸忓牐顫囩€电噦绱濋崘宥呭竾閺嬵亗鈧?;
+      fx.combatFeedLabel = '战场稳定';
+      fx.combatFeedMeta = '先观察，再压枪。';
       fx.combatFeedTimer = 0;
       fx.combatFeedMaxTimer = 0;
       fx.combatFeedLift = 8;
@@ -6985,7 +6456,7 @@
       if (modeBadgeEl) {
         const mode = getEffectiveGameMode(state.gameMode);
         const difficulty = getDifficultyLabel(getDifficultyForMode(state.gameMode));
-        modeBadgeEl.textContent = `${mode?.name || state.gameMode} 璺?${difficulty}`;
+        modeBadgeEl.textContent = `${mode?.name || state.gameMode} · ${difficulty}`;
       }
     }
 
@@ -7550,7 +7021,7 @@
           });
           setCombatFeed(
             event.type,
-            event.type === 'headshot' ? '閻栧棗銇旈崙缁樻絻' : event.type === 'kill' ? '缂佸牏绮ㄧ涵顔款吇' : event.type === 'player_hit' ? '閸涙垝鑵戠涵顔款吇' : '閸涙垝鑵戦悳顖氼暔',
+            event.type === 'headshot' ? '爆头击杀' : event.type === 'kill' ? '终结确认' : event.type === 'player_hit' ? '命中确认' : '命中环境',
             config.label,
             config.duration * 1.5,
             {
@@ -7752,7 +7223,7 @@
         hit,
         shotEnd,
         missCandidate,
-        isHeadshot: false // 閻栧棗銇旈弽鍥唶閸?commitShotPellet 娑擃厼鍨界€?
+        isHeadshot: false // 爆头标记在 commitShotPellet 中判定
       };
     }
 
@@ -7761,7 +7232,7 @@
         const target = pelletResult.hit;
         const damage = weapon.damage * (isAI ? (aiTuning?.aiDamageMul ?? 1) : 1);
 
-        // 閻栧棗銇旈崚銈呯暰閿涙俺顓哥粻妤€鎳℃稉顓犲仯娑撳海娲伴弽鍥﹁厬韫囧啰娈戠捄婵堫瀲
+        // 爆头判定：计算命中点与目标中心的距离
         const hitPoint = pelletResult.shotEnd;
         const dx = hitPoint.x - target.position.x;
         const dz = hitPoint.z - target.position.z;
@@ -7770,7 +7241,8 @@
 
         let didKill;
         if (isHeadshot) {
-          // 閻栧棗銇旈惄瀛樺复閸戠粯娼?          didKill = applyDamage(target, target.hp + 1, attacker.team, attacker, weapon, origin, pelletResult.shotEnd);
+          // 爆头直接击杀
+          didKill = applyDamage(target, target.hp + 1, attacker.team, attacker, weapon, origin, pelletResult.shotEnd);
         } else {
           didKill = applyDamage(target, damage, attacker.team, attacker, weapon, origin, pelletResult.shotEnd);
         }
@@ -7782,9 +7254,10 @@
         shotResult.hitPosition = shotResult.hitPosition || pelletResult.shotEnd.clone();
         if (isHeadshot) {
           shotResult.didHeadshot = true;
-          // 閻栧棗銇斿鐟板毉閹绘劗銇?          const popupPos = target.position.clone();
+          // 爆头弹出提示
+          const popupPos = target.position.clone();
           popupPos.y = 2.5;
-          spawnPopup('閻栧棗銇旈敍?, popupPos, 'close', 1.0);
+          spawnPopup('爆头！', popupPos, 'close', 1.0);
         }
         if (didKill) shotResult.didKill = true;
         if (!knockState.applied) {
@@ -8164,8 +7637,8 @@
             suddenDeathEl.classList.add('show');
             presentCombatFeedback({
               type: 'round_transition',
-              label: '濞堝﹥顒存稉鈧幖?,
-              meta: '婢舵矮姹夐獮璺哄灙閿涘矁绻橀崗銉х崐閻掕埖顒存禍?,
+              label: '殊死一搏',
+              meta: '多人并列，进入突然死亡',
               duration: 1.0
             });
           }
@@ -8177,8 +7650,8 @@
             suddenDeathEl.classList.add('show');
             presentCombatFeedback({
               type: 'round_transition',
-              label: '濞堝﹥顒存稉鈧幖?,
-              meta: '鐞涒偓闁插繑瀵旈獮绛圭礉娑撳绔撮崙璇插枀閼?,
+              label: '殊死一搏',
+              meta: '血量持平，下一击决胜',
               duration: 1.0
             });
           } else if (player && enemy) {
@@ -8516,7 +7989,7 @@
     }
 
     function updateAim(entity, targetPos, dt) {
-      // FPS 濡€崇础娑撳甯虹€?yaw 閻㈤亶绱堕弽鍥╂纯閹恒儲甯堕崚?
+      // FPS 模式下玩家 yaw 由鼠标直接控制
       if (state.viewMode === 'fps' && entity.isPlayer) {
         entity.group.rotation.y = entity.yaw + MODEL_YAW_OFFSET;
         return;
@@ -8538,10 +8011,12 @@
     }
 
     function getAimPoint() {
-      // FPS 濡€崇础閿涙碍閮ㄩ惄鍛婃簚濮濓絽澧犻弬瑙勬煙閸氭垵褰囬崷浼存桨娴溿倗鍋?      if (state.viewMode === 'fps') {
+      // FPS 模式：沿相机正前方方向取地面交点
+      if (state.viewMode === 'fps') {
         const dir = new THREE.Vector3();
         world.camera.getWorldDirection(dir);
-        // 閻劌鐨犵痪澶哥瑢閸︿即娼伴獮鎶芥桨閻╅晲姘?        const origin = world.camera.position.clone();
+        // 用射线与地面平面相交
+        const origin = world.camera.position.clone();
         const ray = new THREE.Ray(origin, dir);
         const point = new THREE.Vector3();
         const hit = ray.intersectPlane(groundPlane, point);
@@ -8550,12 +8025,13 @@
           point.z = THREE.MathUtils.clamp(point.z, CONFIG.arena.bounds.minZ, CONFIG.arena.bounds.maxZ);
           return point;
         }
-        // 婵″倹鐏夐惇瀣亯缁岀儤鐥呴幍鎾冲煂閸︿即娼伴敍灞藉絿娑撯偓娑擃亣绻欓悙?
+        // 如果看天空没打到地面，取一个远点
         const farPoint = origin.clone().addScaledVector(dir, 50);
         farPoint.y = 0;
         return farPoint;
       }
-      // 娣囶垵顫嬪Ο鈥崇础閿涙矮绻氶幐浣稿斧閺?raycaster 闁槒绶?      raycaster.setFromCamera({ x: input.mouse.x, y: input.mouse.y }, world.camera);
+      // 俯视模式：保持原有 raycaster 逻辑
+      raycaster.setFromCamera({ x: input.mouse.x, y: input.mouse.y }, world.camera);
       const point = new THREE.Vector3();
       const hit = raycaster.ray.intersectPlane(groundPlane, point);
       if (!hit) return null;
@@ -8841,10 +8317,10 @@
 
       if (target.lives <= 0) {
         target.eliminated = true;
-        spawnPopup('瀹稿弶绐愬Ч?, popupPos, 'close', 0.9);
+        spawnPopup('已淘汰', popupPos, 'close', 0.9);
       } else {
         target.respawnTimer = 1.2;
-        spawnPopup(`閸撯晙缍戞径宥嗘た濞嗏剝鏆? ${target.lives}`, popupPos, 'close', 0.7);
+        spawnPopup(`剩余复活次数: ${target.lives}`, popupPos, 'close', 0.7);
       }
 
       const survivors = world.entities.filter((entity) => entity && !entity.eliminated);
@@ -9501,7 +8977,7 @@
 
         const popupPos = target.position.clone();
         popupPos.y = 1.9;
-        spawnPopup('閹匡箑鑴婇煬鏌ユ／閿?, popupPos, 'close', 0.6);
+        spawnPopup('擦弹躲闪！', popupPos, 'close', 0.6);
       }
     }
 
@@ -9524,7 +9000,7 @@
       }
 
       setTimeScale(0.8, 0.35);
-      showBanner(winner === 'p1' ? '閻溾晛顔?1 鐠с垹绶遍張顒€娲栭崥? : '閻溾晛顔?2 鐠с垹绶遍張顒€娲栭崥?);
+      showBanner(winner === 'p1' ? '玩家 1 赢得本回合' : '玩家 2 赢得本回合');
 
       setTimeout(() => {
         state.roundEnding = false;
@@ -9541,7 +9017,7 @@
 	          clearPickups();
 	          clearGrenades();
 	          setMode('roundIntro');
-	          showBanner(`缁?${state.round} 閸ョ偛鎮?璺?瀵偓婵绱抈);
+	          showBanner(`第 ${state.round} 回合 · 开始！`);
           setTimeout(() => {
             if (state.mode === 'roundIntro') setMode('playing');
           }, 1000);
@@ -9592,7 +9068,7 @@
         timeScale: 0
       };
 
-      // FPS 濡€崇础娑撳绻橀崗?kill cam 閸撳秳绻氱€涙顫嬬憴鎺戣嫙閸掑洤娲栨穱顖濐潒
+      // FPS 模式下进入 kill cam 前保存视角并切回俯视
       state.viewModeBeforeKillCam = state.viewMode;
       if (state.viewMode === 'fps') setViewMode('topdown');
 
@@ -9654,9 +9130,10 @@
         if (kc.timer >= holdDur) {
           killCamTextEl.classList.remove('show');
           state.killCam = null;
-          // kill cam 缂佹挻娼崥搴划婢跺秳绠ｉ崜宥囨畱鐟欏棜顫楀Ο鈥崇础
+          // kill cam 结束后恢复之前的视角模式
           if (state.viewModeBeforeKillCam === 'fps') {
-            // 瀵ゆ儼绻滄稉鈧敮褎浠径宥忕礉闁灝鍘ら崪?endMatch 閸欑姴濮?            setTimeout(() => {
+            // 延迟一帧恢复，避免和 endMatch 叠加
+            setTimeout(() => {
               if (state.mode === 'playing') setViewMode('fps');
             }, 0);
           }
@@ -9741,13 +9218,13 @@
       const matchSummary = buildMatchAwardSummary(winner, elapsed);
       state.lastMatchSummary = matchSummary;
       if (!winner) {
-        matchTitle.textContent = '濮ｆ棁绂岀紒鎾存将';
+        matchTitle.textContent = '比赛结束';
       } else {
         const winnerEntity = getEntityByTeam(winner);
         const winnerLabel = winnerEntity?.displayName || (winner === 'p1' ? 'Player 1' : winner === 'p2' ? 'Player 2' : 'Player');
-        matchTitle.textContent = `${winnerLabel.toUpperCase()} 閼剧柉鍎ㄩ敍涔?
+        matchTitle.textContent = `${winnerLabel.toUpperCase()} 获胜！`;
       }
-      matchStats.textContent = `濮ｆ棁绂岄悽銊︽: ${formatTime(elapsed)} 璺?閺堫剙鐪琈VP: ${matchSummary.mvpName || '閺?}`;
+      matchStats.textContent = `比赛用时: ${formatTime(elapsed)} · 本局MVP: ${matchSummary.mvpName || '无'}`;
 
       if (state.gameMode === 'duel' && winner === 'p1') {
         if (state.bestWinTime === null || elapsed < state.bestWinTime) {
@@ -9773,7 +9250,7 @@
       if (state.mode !== 'playing' && state.mode !== 'paused') return;
       if (state.mode === 'playing') {
         setMode('paused');
-        bannerEl.textContent = '瀹稿弶娈忛崑?;
+        bannerEl.textContent = '已暂停';
         bannerEl.classList.add('show');
       } else if (state.mode === 'paused') {
         bannerEl.classList.remove('show');
@@ -9799,12 +9276,12 @@
         updateWeaponDisplay(panel, entity);
         if (panel.livesInfo) {
           panel.livesInfo.style.display = showLives ? 'block' : 'none';
-          panel.livesInfo.textContent = `閸撯晙缍戦悽鐔锋嚒: ${Math.max(0, entity.lives ?? 0)}`;
+          panel.livesInfo.textContent = `剩余生命: ${Math.max(0, entity.lives ?? 0)}`;
         }
         panel.panel.classList.toggle('down', entity.isDead || entity.eliminated);
         panel.panel.style.transform = `scale(${hudProfile.playerPanelScale || 1})`;
       });
-      timerEl.textContent = `閸撯晙缍戦弮鍫曟？: ${formatTime(state.timeLeft)}`;
+      timerEl.textContent = `剩余时间: ${formatTime(state.timeLeft)}`;
       timerEl.classList.toggle('low', state.timeLeft <= 30);
       timerEl.style.transform = `scale(${hudProfile.timerScale || 1})`;
       const player = getPlayer();
@@ -9835,9 +9312,9 @@
       const isLivePvp = state.mode === 'pvpPlaying';
       const weaponState = player ? getWeaponState(player) : null;
       const weaponNameMap = {
-        pistol: '閹靛鐏?,
-        smg: '閸愭煡鏀?,
-        shotgun: '閸犲嘲鐡?
+        pistol: '手枪',
+        smg: '冲锋',
+        shotgun: '喷子'
       };
       const dangerSeverity = hud.dataset.danger || 'calm';
       const isSwitching = Boolean(player?.weapon?.switchTimer > 0 && player?.weapon?.pending);
@@ -9848,25 +9325,25 @@
       const grenadeAmmo = player ? player.grenadeAmmo || 0 : 0;
 
       if (mobileTopTimerEl) {
-        mobileTopTimerEl.textContent = `閸撯晙缍?${formatTime(state.timeLeft)}`;
+        mobileTopTimerEl.textContent = `剩余 ${formatTime(state.timeLeft)}`;
       }
 
       if (mobileModeChipEl) {
-        mobileModeChipEl.textContent = modeBadgeEl?.textContent || (state.gameMode === 'deathmatch' ? '4娴滆桨璐￠弬? : '1v1 鐎电懓鍠?);
+        mobileModeChipEl.textContent = modeBadgeEl?.textContent || (state.gameMode === 'deathmatch' ? '4人乱斗' : '1v1 对决');
       }
 
       if (mobileDangerChipEl) {
-        mobileDangerChipEl.textContent = dangerBadgeEl?.textContent || '閹存ê婧€缁嬪啿鐣?;
+        mobileDangerChipEl.textContent = dangerBadgeEl?.textContent || '战场稳定';
         mobileDangerChipEl.dataset.severity = dangerSeverity;
       }
 
       if (mobileWeaponNameEl) {
         if (!player) {
-          mobileWeaponNameEl.textContent = '缁涘绶熺憴鎺曞';
+          mobileWeaponNameEl.textContent = '等待角色';
         } else if (isSwitching) {
-          mobileWeaponNameEl.textContent = '閸掑洦鐏欐稉?;
+          mobileWeaponNameEl.textContent = '切枪中';
         } else {
-          mobileWeaponNameEl.textContent = weaponNameMap[activeWeaponId] || activeWeaponConfig?.name || '濮濓箑娅?;
+          mobileWeaponNameEl.textContent = weaponNameMap[activeWeaponId] || activeWeaponConfig?.name || '武器';
         }
       }
 
@@ -9875,21 +9352,21 @@
         if (!player || !weaponState || !activeWeaponConfig) {
           mobileWeaponAmmoEl.textContent = hpText;
         } else if (isSwitching) {
-          mobileWeaponAmmoEl.textContent = `${hpText} 璺?閸戝棗顦稉鐠?
+          mobileWeaponAmmoEl.textContent = `${hpText} · 准备中`;
         } else if (weaponState.reloadTimer > 0) {
-          mobileWeaponAmmoEl.textContent = `${hpText} 璺?閹广垹鑴婃稉鐠?
+          mobileWeaponAmmoEl.textContent = `${hpText} · 换弹中`;
         } else {
-          mobileWeaponAmmoEl.textContent = `${hpText} 璺?${weaponState.ammo}/${activeWeaponConfig.magSize} [${weaponState.reserve}]`;
+          mobileWeaponAmmoEl.textContent = `${hpText} · ${weaponState.ammo}/${activeWeaponConfig.magSize} [${weaponState.reserve}]`;
         }
       }
 
       if (mobilePauseBtn) {
-        mobilePauseBtn.textContent = state.mode === 'paused' ? '缂佈呯敾' : '閺嗗倸浠?;
+        mobilePauseBtn.textContent = state.mode === 'paused' ? '继续' : '暂停';
       }
 
       if (mobileTacticalBtn) {
         mobileTacticalBtn.disabled = !isPlaying || mobileState.orientationBlocked;
-        mobileTacticalBtn.textContent = mobileState.panelExpanded ? '閺€鎯版崳' : '閹存ɑ婀?;
+        mobileTacticalBtn.textContent = mobileState.panelExpanded ? '收起' : '战术';
       }
 
       if (mobileFireBtn) {
@@ -9910,17 +9387,17 @@
 
       if (mobileDashBtn) {
         mobileDashBtn.disabled = !isPlaying || !player || dashCooldown > 0;
-        mobileDashBtn.textContent = dashCooldown > 0.05 ? `闂傤亪浼?${dashCooldown.toFixed(1)}s` : '闂傤亪浼?;
+        mobileDashBtn.textContent = dashCooldown > 0.05 ? `闪避 ${dashCooldown.toFixed(1)}s` : '闪避';
       }
 
       if (mobileWeaponBtn) {
         mobileWeaponBtn.disabled = !isPlaying || !player || player.weapon?.switchTimer > 0;
         if (!player) {
-          mobileWeaponBtn.textContent = '閸掑洦鐏?;
+          mobileWeaponBtn.textContent = '切枪';
         } else if (isSwitching) {
-          mobileWeaponBtn.textContent = '閸掑洦鐏欐稉?;
+          mobileWeaponBtn.textContent = '切枪中';
         } else {
-          mobileWeaponBtn.textContent = `閸掑洦鐏?${weaponNameMap[activeWeaponId] || ''}`.trim();
+          mobileWeaponBtn.textContent = `切枪 ${weaponNameMap[activeWeaponId] || ''}`.trim();
         }
       }
 
@@ -9932,8 +9409,8 @@
           mobileGrenadeBtn.hidden = false;
           mobileGrenadeBtn.disabled = !isPlaying || !player || grenadeAmmo <= 0 || grenadeCooldown > 0;
           mobileGrenadeBtn.textContent = grenadeCooldown > 0.05
-            ? `閹靛娴?${grenadeCooldown.toFixed(1)}s`
-            : `閹靛娴?${grenadeAmmo}`;
+            ? `手雷 ${grenadeCooldown.toFixed(1)}s`
+            : `手雷 ${grenadeAmmo}`;
         }
       }
 
@@ -9972,7 +9449,7 @@
         name.textContent = entity.displayName || entity.id;
         label.append(badge, name);
         const lives = document.createElement('span');
-        lives.textContent = `閸撯晙缍戦悽鐔锋嚒: ${Math.max(0, entity.lives ?? 0)}`;
+        lives.textContent = `剩余生命: ${Math.max(0, entity.lives ?? 0)}`;
         row.append(label, lives);
         leaderboardList.appendChild(row);
       });
@@ -9980,7 +9457,7 @@
 
     function updateWeaponDisplay(panel, entity) {
       const isSwitching = entity.weapon.switchTimer > 0 && entity.weapon.pending;
-      const activeId = entity.weapon.id;
+      const activeId = isSwitching ? entity.weapon.pending : entity.weapon.id;
       const weapon = getWeaponConfig(activeId);
       const state = getWeaponState(entity, activeId);
       if (!weapon || !state) return;
@@ -9988,7 +9465,7 @@
       panel.weaponIcon.textContent = weapon.name[0];
       panel.weaponName.textContent = weapon.name;
       if (isSwitching) {
-        panel.weaponAmmo.textContent = '閸掑洦宕叉稉?;
+        panel.weaponAmmo.textContent = '切换中';
         panel.weaponReserve.textContent = '';
       } else {
         panel.weaponAmmo.textContent = `${state.ammo}/${weapon.magSize}`;
@@ -10290,7 +9767,7 @@
     function updateCameraFx(dt) {
       if (state.mode === 'killCam') return;
 
-      // FPS 濡€崇础閿涙氨娴夐張楦跨闂呭繒甯虹€?
+      // FPS 模式：相机跟随玩家
       if (state.viewMode === 'fps') {
         const player = getPlayer();
         if (!player) return;
@@ -10299,13 +9776,15 @@
         const yaw = player.yaw;
         const pitch = state.fpsPitch;
 
-        // 閻╁憡婧€娴ｅ秶鐤?= 閻溾晛顔嶆担宥囩枂 + 閻ジ鐝?        world.camera.position.set(
+        // 相机位置 = 玩家位置 + 眼高
+        world.camera.position.set(
           player.position.x,
           eyeHeight,
           player.position.z
         );
 
-        // 閺嶈宓?yaw + pitch 鐠侊紕鐣婚惇瀣倻閻ㄥ嫮鍋?        const lookDir = new THREE.Vector3(
+        // 根据 yaw + pitch 计算看向的点
+        const lookDir = new THREE.Vector3(
           Math.sin(yaw) * Math.cos(pitch),
           Math.sin(pitch),
           Math.cos(yaw) * Math.cos(pitch)
@@ -10313,11 +9792,12 @@
         const lookTarget = world.camera.position.clone().add(lookDir);
         world.camera.lookAt(lookTarget);
 
-        // FPS 娴ｈ法鏁ゆ稉鎾崇潣 FOV
+        // FPS 使用专属 FOV
         world.camera.fov = CONFIG.camera.fps.fov + fx.fovPulse * 2;
         world.camera.updateProjectionMatrix();
 
-        // 閺嬵亝顫幎鏍уЗ閿涘湗PS 娑撳缂夌亸蹇曢兇閺佸府绱?        if (fx.shakeTime > 0) {
+        // 枪械抖动（FPS 下缩小系数）
+        if (fx.shakeTime > 0) {
           const shake = fx.shakeIntensity * CONFIG.camera.fps.shakeMultiplier;
           world.camera.position.x += (Math.random() - 0.5) * shake * 0.42;
           world.camera.position.y += (Math.random() - 0.5) * shake * 0.22;
@@ -10325,12 +9805,12 @@
           fx.shakeTime -= dt;
         }
 
-        // 鐞涙澘鍣?pulse
+        // 衰减 pulse
         fx.fovPulse = moveToward(fx.fovPulse, 0, dt * 5);
         fx.shotRecoilPulse = moveToward(fx.shotRecoilPulse, 0, dt * 4.5);
         fx.lowHpPulse = moveToward(fx.lowHpPulse, 0, dt * 2.2);
 
-        // 娴ｅ氦顢呴柌蹇曞閼瑰弶绗庨弲?
+        // 低血量红色渐晕
         const lowHpProfile = getGlobalFeedbackProfile().low_hp;
         const persistentDangerConfig = getPersistentDangerConfig();
         if (player && lowHpProfile && fx.backgroundSeverity === 'critical' && player.hp <= lowHpProfile.threshold) {
@@ -10344,7 +9824,8 @@
           lowHpVignette.style.opacity = '0';
         }
 
-        return; // FPS 濡€崇础閸掔増顒濈紒鎾存将閿涘奔绗夌挧棰佸垔鐟欏棝鈧槒绶?      }
+        return; // FPS 模式到此结束，不走俯视逻辑
+      }
 
       if (!world.cameraState) {
         world.cameraState = {
@@ -11211,7 +10692,7 @@
             targetTeam: team
           });
         },
-        triggerRoundTransition(label = '閸ョ偛鎮庨懞鍌氼殧閸掑洦宕?, meta = '闁插秶鐤嗙粩娆庣秴閿涘奔绨ゆ径杞拌厬缁?) {
+        triggerRoundTransition(label = '回合节奏切换', meta = '重置站位，争夺中线') {
           presentCombatFeedback({
             type: 'round_transition',
             label,
