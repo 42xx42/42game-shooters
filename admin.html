@@ -3,25 +3,26 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>CDK 閸氬骸褰?/title>
+  <title>CDK 后台</title>
   <style>
 
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
 
     :root {
-      color-scheme: dark;
-      --bg: #000000;
-      --panel: #0a0a0a;
-      --panel-alt: #171717;
-      --text: #ededed;
-      --muted: #a3a3a3;
-      --accent: #ededed;
-      --accent-text: #0a0a0a;
+      color-scheme: light;
+      --bg: #fafafa;
+      --panel: #ffffff;
+      --panel-alt: #f4f4f5;
+      --text: #09090b;
+      --muted: #71717a;
+      --accent: #18181b;
+      --accent-hover: #27272a;
       --warn: #eab308;
       --ok: #10b981;
       --danger: #ef4444;
-      --border: #262626;
-      --border-hover: #404040;
+      --border: #e4e4e7;
+      --shadow-sm: 0 1px 2px rgba(0,0,0,0.04);
+      --shadow: 0 2px 8px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02);
       font-family: 'Inter', system-ui, -apple-system, sans-serif;
     }
 
@@ -65,7 +66,7 @@
       -webkit-font-smoothing: antialiased;
     }
 
-    a { color: var(--text); text-decoration: none; transition: color 0.15s; }
+    a { color: var(--text); text-decoration: underline; text-underline-offset: 4px; font-weight: 500; }
     a:hover { color: var(--muted); }
 
     .page {
@@ -77,7 +78,8 @@
     .hero, .panel {
       background: var(--panel);
       border: 1px solid var(--border);
-      border-radius: 8px;
+      border-radius: 12px;
+      box-shadow: var(--shadow);
     }
 
     .hero {
@@ -128,11 +130,12 @@
       font-size: 13px;
       border-radius: 6px;
       font-weight: 500;
+      box-shadow: var(--shadow-sm);
     }
 
     .avatar { width: 20px; height: 20px; border-radius: 50%; object-fit: cover; }
 
-    .actions { display: flex; gap: 12px; flex-wrap: wrap; }
+    .actions { display: flex; gap: 8px; flex-wrap: wrap; }
 
     button, .button-link {
       appearance: none;
@@ -144,26 +147,29 @@
       font-size: 14px;
       text-decoration: none;
       cursor: pointer;
-      color: var(--accent-text);
+      color: #ffffff;
       background: var(--accent);
-      transition: background 0.15s, opacity 0.15s, border-color 0.15s;
+      transition: background 0.15s, border-color 0.15s;
+      box-shadow: var(--shadow-sm);
     }
 
     button:hover, .button-link:hover {
-      opacity: 0.9;
+      background: var(--accent-hover);
+      border-color: var(--accent-hover);
+      color: #ffffff;
+      text-decoration: none;
     }
 
     button.secondary, .button-link.secondary {
       color: var(--text);
-      background: var(--bg);
+      background: #ffffff;
       border: 1px solid var(--border);
     }
 
     button.secondary:hover, .button-link.secondary:hover {
-      background: var(--panel-alt);
-      border-color: var(--border-hover);
+      background: #f4f4f5;
+      border-color: #d4d4d8;
       color: var(--text);
-      opacity: 1;
     }
 
     button:disabled { opacity: 0.5; cursor: not-allowed; }
@@ -177,8 +183,10 @@
     .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 32px; }
     .stat {
       padding: 20px;
-      background: var(--panel-alt);
+      background: #ffffff;
+      border: 1px solid var(--border);
       border-radius: 8px;
+      box-shadow: var(--shadow-sm);
     }
     .stat span { display: block; color: var(--muted); font-size: 13px; font-weight: 500; margin-bottom: 8px; }
     .stat strong { font-size: 32px; font-weight: 600; color: var(--text); letter-spacing: -0.03em; }
@@ -188,26 +196,28 @@
     .span-all { grid-column: 1 / -1; }
     .policy-summary {
       display: grid; gap: 6px; margin-bottom: 24px; padding: 16px;
-      background: var(--panel-alt); border-radius: 8px;
+      background: var(--panel-alt); border-radius: 8px; border: 1px solid var(--border);
     }
-
+    
     label { display: grid; gap: 8px; font-weight: 500; font-size: 14px; color: var(--text); }
-
+    
     input, select, textarea {
       width: 100%;
       border: 1px solid var(--border);
       border-radius: 6px;
-      background: var(--bg);
+      background: #ffffff;
       color: var(--text);
       font-family: inherit;
       padding: 10px 14px;
       font-size: 14px;
-      transition: border-color 0.15s;
+      transition: border-color 0.15s, box-shadow 0.15s;
+      box-shadow: var(--shadow-sm);
     }
 
     input:focus, select:focus, textarea:focus {
       outline: none;
-      border-color: var(--muted);
+      border-color: var(--text);
+      box-shadow: 0 0 0 1px var(--text);
     }
 
     textarea { min-height: 120px; resize: vertical; }
@@ -220,13 +230,12 @@
       overflow-x: auto;
       border-radius: 8px;
       border: 1px solid var(--border);
-      background: var(--panel);
+      background: #ffffff;
     }
 
     table { width: 100%; border-collapse: collapse; min-width: 800px; text-align: left; }
     th, td { padding: 14px 16px; border-bottom: 1px solid var(--border); font-size: 14px; }
     th { color: var(--muted); font-size: 13px; font-weight: 500; background: var(--panel-alt); }
-    tbody tr:hover { background: rgba(255, 255, 255, 0.02); }
     td code {
       font-size: 13px; color: var(--text); background: var(--panel-alt);
       padding: 2px 6px; border-radius: 4px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
@@ -237,14 +246,14 @@
       display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 4px;
       font-size: 12px; font-weight: 500;
     }
-    .status.available, .status.claimed { color: #34d399; background: rgba(52, 211, 153, 0.1); border: 1px solid rgba(52, 211, 153, 0.2); }
-    .status.assigned { color: #fbbf24; background: rgba(251, 191, 36, 0.1); border: 1px solid rgba(251, 191, 36, 0.2); }
-    .status.ready { color: #60a5fa; background: rgba(96, 165, 250, 0.1); border: 1px solid rgba(96, 165, 250, 0.2); }
-    .status.not_eligible { color: #a3a3a3; background: rgba(163, 163, 163, 0.1); border: 1px solid rgba(163, 163, 163, 0.2); }
-    .status.pool-pve { color: #2dd4bf; background: rgba(45, 212, 191, 0.1); border: 1px solid rgba(45, 212, 191, 0.2); }
-    .status.pool-pvp, .status.pool-pvp_duel { color: #f97316; background: rgba(249, 115, 22, 0.1); border: 1px solid rgba(249, 115, 22, 0.2); }
-    .status.pool-pvp_deathmatch { color: #f43f5e; background: rgba(244, 63, 94, 0.1); border: 1px solid rgba(244, 63, 94, 0.2); }
-    .status.pool-pvp_legacy { color: #a3a3a3; background: rgba(163, 163, 163, 0.1); border: 1px solid rgba(163, 163, 163, 0.2); }
+    .status.available, .status.claimed { color: #059669; background: #d1fae5; border: 1px solid #a7f3d0; }
+    .status.assigned { color: #d97706; background: #fef3c7; border: 1px solid #fde68a; }
+    .status.ready { color: #2563eb; background: #dbeafe; border: 1px solid #bfdbfe; }
+    .status.not_eligible { color: #52525b; background: #f4f4f5; border: 1px solid #e4e4e7; }
+    .status.pool-pve { color: #0d9488; background: #ccfbf1; border: 1px solid #99f6e4; }
+    .status.pool-pvp, .status.pool-pvp_duel { color: #ea580c; background: #ffedd5; border: 1px solid #fed7aa; }
+    .status.pool-pvp_deathmatch { color: #e11d48; background: #ffe4e6; border: 1px solid #fecdd3; }
+    .status.pool-pvp_legacy { color: #52525b; background: #f4f4f5; border: 1px solid #e4e4e7; }
 
     .cell-stack { display: grid; gap: 4px; }
     .minor { color: var(--muted); font-size: 13px; line-height: 1.5; }
@@ -265,135 +274,140 @@
 <body>
   <div class="page">
     <section class="hero">
-      <div class="eyebrow">Linux.do CDK 閹貉冨煑閸?/div>
-      <h1>CDK 婵傛牗鐫滅粻锛勬倞 + Linux.do 閻ц缍?/h1>
+      <div class="eyebrow">Linux.do CDK 控制台</div>
+      <h1>CDK 奖池管理 + Linux.do 登录</h1>
       <p class="subtle">
-        鏉╂瑩鍣烽弰顖氱秼閸撳秴鐨犻崙缁樼川缁€娲€嶉惄顔炬畱閸氬骸褰撮妴鍌欑稑閸欘垯浜掔€电厧鍙?PVE / PVP 閸忔垶宕查惍浣碘偓浣圭叀閻褰傞惍浣风瑢鐎电懓鐪崢鍡楀蕉閵?
-        楠炲墎娲块幒銉ㄧ殶閺佸瓨鐦￠弮銉ュ絺閻浇顫夐崚娆嶁偓?
+        这里是当前射击演示项目的后台。你可以导入 PVE / PVP 兑换码、查看发码与对局历史、
+        并直接调整每日发码规则。
       </p>
       <div class="topbar">
         <div class="session-pill" id="sessionPill">
           <img class="avatar hidden" id="sessionAvatar" alt="" />
-          <span id="sessionText">濮濓絽婀Λ鈧弻銉ф瑜版洜濮搁幀?..</span>
+          <span id="sessionText">正在检查登录状态...</span>
         </div>
         <div class="actions">
-          <a class="button-link secondary" href="/">鏉╂柨娲栧〒鍛婂灆</a>
-          <a class="button-link hidden" id="loginLink" href="/auth/linuxdo/start?returnTo=/admin.html">娴ｈ法鏁?Linux.do 閻ц缍?/a>
-          <button class="secondary hidden" id="logoutButton" type="button">闁偓閸戣櫣娅ヨぐ?/button>
-          <button class="hidden" id="refreshButton" type="button">閸掗攱鏌?/button>
+          <a class="button-link secondary" href="/">返回游戏</a>
+          <a class="button-link hidden" id="loginLink" href="/auth/linuxdo/start?returnTo=/admin.html">使用 Linux.do 登录</a>
+          <button class="secondary hidden" id="logoutButton" type="button">退出登录</button>
+          <button class="hidden" id="refreshButton" type="button">刷新</button>
         </div>
       </div>
-      <div class="minor" id="awardSecurityText">濮濓絽婀拠璇插絿瑜版挸澧犻崣鎴犵垳濡€崇础...</div>
+      <div class="minor" id="awardSecurityText">正在读取当前发码模式...</div>
     </section>
 
     <section class="panel gate hidden" id="gatePanel">
-      <h2>闂団偓鐟曚礁鎮楅崣鐗堟綀闂?/h2>
-      <p id="gateText">鐠囪渹濞囬悽銊ュ嚒閸旂姴鍙嗙粻锛勬倞閸涙娅ч崥宥呭礋閻?Linux.do 鐠愶箑褰块惂璇茬秿閿涘本澧犻懗鍊熺箻閸忋儱鎮楅崣鑸偓?/p>
+      <h2>需要后台权限</h2>
+      <p id="gateText">请使用已加入管理员白名单的 Linux.do 账号登录，才能进入后台。</p>
     </section>
 
     <section class="grid hidden" id="adminApp">
       <div class="panel span-2">
-        <h2>閸欐垹鐖滅憴鍕灟</h2>
+        <h2>发码规则</h2>
         <p>
-          鏉╂瑩鍣烽崣顖欎簰閻╁瓨甯撮柊宥囩枂濮ｅ繑妫╅崣鎴犵垳娑撳﹪妾洪敍灞肩箽鐎涙ê鎮楁导姘晸閸?<code>data/app-config.json</code>閵?
-          婵″倹鐏夐張宥呭閸氼垰濮╅弮鍫曞帳缂冾喕绨?<code>REWARD_LIMIT_*</code> 閻滎垰顣ㄩ崣姗€鍣洪敍灞界杽闂勫懐鏁撻弫鍫濃偓闂寸矝娴兼矮浜掗悳顖氼暔閸欐﹢鍣烘稉鍝勫櫙閵?
+          这里可以直接配置每日发码上限，保存后会写入 <code>data/app-config.json</code>。
+          如果服务启动时配置了 <code>REWARD_LIMIT_*</code> 环境变量，实际生效值仍会以环境变量为准。
         </p>
         <div class="policy-summary">
-          <div class="minor" id="rewardPolicySummaryText">濮濓絽婀崝鐘烘祰閸欐垹鐖滅憴鍕灟...</div>
+          <div class="minor" id="rewardPolicySummaryText">正在加载发码规则...</div>
           <div class="minor" id="rewardPolicyOverrideText"></div>
         </div>
         <form id="rewardPolicyForm">
           <div class="reward-policy-grid">
             <label class="span-all">
-              閺冭泛灏?              <input id="rewardTimeZone" type="text" maxlength="64" placeholder="Asia/Shanghai" required />
+              时区
+              <input id="rewardTimeZone" type="text" maxlength="64" placeholder="Asia/Shanghai" required />
             </label>
             <label>
-              PVE novice / 閺傜増澧?              <input id="rewardPveNovice" type="number" min="0" step="1" inputmode="numeric" required />
+              PVE novice / 新手
+              <input id="rewardPveNovice" type="number" min="0" step="1" inputmode="numeric" required />
             </label>
             <label>
-              PVE easy / 缁犫偓閸?
+              PVE easy / 简单
               <input id="rewardPveEasy" type="number" min="0" step="1" inputmode="numeric" required />
             </label>
             <label>
-              PVE normal / 閺咁噣鈧?
+              PVE normal / 普通
               <input id="rewardPveNormal" type="number" min="0" step="1" inputmode="numeric" required />
             </label>
             <label>
-              PVE hard / 閸ヤ即姣?              <input id="rewardPveHard" type="number" min="0" step="1" inputmode="numeric" required />
+              PVE hard / 困难
+              <input id="rewardPveHard" type="number" min="0" step="1" inputmode="numeric" required />
             </label>
             <label>
-              PVP default / 濮ｅ繑妫╂稉濠囨
+              PVP default / 每日上限
               <input id="rewardPvpDefault" type="number" min="0" step="1" inputmode="numeric" required />
             </label>
           </div>
           <div class="actions">
-            <button type="submit">娣囨繂鐡ㄩ崣鎴犵垳鐟欏嫬鍨?/button>
-            <button class="secondary" id="rewardPolicyResetButton" type="button">閹垹顦茶ぐ鎾冲瀹歌弓绻氱€涙ê鈧?/button>
+            <button type="submit">保存发码规则</button>
+            <button class="secondary" id="rewardPolicyResetButton" type="button">恢复当前已保存值</button>
           </div>
         </form>
         <div class="message" id="rewardPolicyMessage"></div>
       </div>
 
       <div class="panel">
-        <h2>濞ｈ濮?CDK</h2>
-        <p>閸忓牓鈧瀚ㄦ總鏍ㄧ潨閿涘苯鍟€娑撯偓鐞涘奔绔存稉顏勵嚤閸忋儱鍘幑銏㈢垳閵嗕揪VP 閸忔垶宕查惍浣稿讲娴犮儲瀵?1v1 / 4 娴?/ 闁氨鏁ら崗鐓庮啇閸掑棙鐫滅€电厧鍙嗛敍灞炬箛閸旓紕顏导姘斧閺嶈渹绻氱€涙﹫绱濋獮鎯板殰閸斻劏鐑︽潻鍥х暚閸忋劑鍣告径宥囨畱閻降鈧?/p>
+        <h2>添加 CDK</h2>
+        <p>先选择奖池，再一行一个导入兑换码。PVP 兑换码可以按 1v1 / 4 人 / 通用兼容分池导入，服务端会原样保存，并自动跳过完全重复的码。</p>
         <form id="cdkForm">
           <label>
-            閸欐垹鐖滅猾璇茬€?            <select id="cdkPool">
-              <option value="pve">PVE 婵傛牗鐫?/option>
-              <option value="pvp_duel">PVP 1v1 婵傛牗鐫?/option>
-              <option value="pvp_deathmatch">PVP 4 娴滃搫顨涘Ч?/option>
-              <option value="pvp">PVP 闁氨鏁ゆ總鏍ㄧ潨閿涘牆鍚嬬€圭櫢绱?/option>
+            发码类型
+            <select id="cdkPool">
+              <option value="pve">PVE 奖池</option>
+              <option value="pvp_duel">PVP 1v1 奖池</option>
+              <option value="pvp_deathmatch">PVP 4 人奖池</option>
+              <option value="pvp">PVP 通用奖池（兼容）</option>
             </select>
           </label>
           <label>
-            閹佃顐兼径鍥ㄦ暈
-            <input id="batchNote" type="text" maxlength="200" placeholder="閸欘垶鈧绱濈紒娆掔箹濞嗏€愁嚤閸忋儱濮炴稉鈧稉顏勵槵濞? />
+            批次备注
+            <input id="batchNote" type="text" maxlength="200" placeholder="可选，给这次导入加一个备注" />
           </label>
           <label>
-            CDK 閸掓銆?            <textarea id="cdkBulkText" placeholder="ABC123&#10;DEF456&#10;GHI789"></textarea>
+            CDK 列表
+            <textarea id="cdkBulkText" placeholder="ABC123&#10;DEF456&#10;GHI789"></textarea>
           </label>
           <div class="actions">
-            <button id="importButton" type="submit">鐎电厧鍙嗛崗鎴炲床閻?/button>
-            <button class="secondary" id="clearButton" type="button">濞撳懐鈹?/button>
+            <button id="importButton" type="submit">导入兑换码</button>
+            <button class="secondary" id="clearButton" type="button">清空</button>
           </div>
         </form>
         <div class="message" id="formMessage"></div>
       </div>
 
       <div class="panel">
-        <h2>閻焦鐫滃鍌濐潔</h2>
-        <p>PVE 娑?PVP 鐎硅埖妫岄崚鍡楃磻缂佺喕顓搁敍瀛璙P 娴兼氨鎴风紒顓熷閹?1v1 / 4 娴?/ 闁氨鏁ら崗鐓庮啇娑撳閲滅€涙劖鐫滈妴鍌濈箹闁插奔绱扮仦鏇犮仛閹鍣洪妴浣稿讲閸欐垶鏆熼柌蹇嬧偓浣稿嚒濞叉儳褰傞弫浼村櫤閿涘奔浜掗崣濠傜秼閸撳秶鏁撻弫鍫㈡畱閸欐垹鐖滅憴鍕灟閹芥顩﹂妴?/p>
+        <h2>码池概览</h2>
+        <p>PVE 与 PVP 家族分开统计，PVP 会继续拆成 1v1 / 4 人 / 通用兼容三个子池。这里会展示总量、可发数量、已派发数量，以及当前生效的发码规则摘要。</p>
         <div class="stats">
           <div class="stat">
-            <span>閹粯鏆?/span>
+            <span>总数</span>
             <strong id="statTotal">0</strong>
           </div>
           <div class="stat">
-            <span>閸欘垱娣抽崣?/span>
+            <span>可派发</span>
             <strong id="statAvailable">0</strong>
           </div>
           <div class="stat">
-            <span>瀹稿弶娣抽崣?/span>
+            <span>已派发</span>
             <strong id="statAssigned">0</strong>
           </div>
         </div>
-        <p id="poolSummaryText">PVE / PVP 閻焦鐫滅紒鐔活吀閸旂姾娴囨稉?..</p>
+        <p id="poolSummaryText">PVE / PVP 码池统计加载中...</p>
         <div class="table-wrap">
           <table>
             <thead>
               <tr>
-                <th>閻樿埖鈧?/th>
-                <th>缁鐎?/th>
-                <th>閸忔垶宕查惍?/th>
-                <th>婢跺洦鏁?/th>
-                <th>妫板棗褰囨禍?/th>
-                <th>妫板棗褰囬弮鍫曟？</th>
+                <th>状态</th>
+                <th>类型</th>
+                <th>兑换码</th>
+                <th>备注</th>
+                <th>领取人</th>
+                <th>领取时间</th>
               </tr>
             </thead>
             <tbody id="cdkTableBody">
               <tr>
-                <td colspan="6">閸旂姾娴囨稉?..</td>
+                <td colspan="6">加载中...</td>
               </tr>
             </tbody>
           </table>
@@ -401,24 +415,24 @@
       </div>
 
       <div class="panel span-2">
-        <h2>鐎电懓鐪崢鍡楀蕉</h2>
-        <p id="matchSummaryText">濮濓絽婀崝鐘烘祰鐎电懓鐪崢鍡楀蕉...</p>
+        <h2>对局历史</h2>
+        <p id="matchSummaryText">正在加载对局历史...</p>
         <div class="table-wrap">
           <table>
             <thead>
               <tr>
-                <th>鐎瑰本鍨氶弮鍫曟？</th>
-                <th>閻溾晛顔?/th>
-                <th>缁鐎?/th>
-                <th>鐎电懓鐪?/th>
-                <th>缂佹挻鐏?/th>
-                <th>婵傛牕濮?/th>
+                <th>完成时间</th>
+                <th>玩家</th>
+                <th>类型</th>
+                <th>对局</th>
+                <th>结果</th>
+                <th>奖励</th>
                 <th>Ticket</th>
               </tr>
             </thead>
             <tbody id="matchTableBody">
               <tr>
-                <td colspan="7">閸旂姾娴囨稉?..</td>
+                <td colspan="7">加载中...</td>
               </tr>
             </tbody>
           </table>
