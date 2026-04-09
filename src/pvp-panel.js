@@ -360,7 +360,7 @@ function ensurePanel() {
       <button class="pvp-mode-btn" data-mode="deathmatch" type="button">4人乱斗</button>
     </div>
     <div class="pvp-heading-row">
-      <span class="pvp-caption">鍦板浘鍊惧ソ</span>
+      <span class="pvp-caption">地图偏好</span>
     </div>
     <div class="pvp-mode-buttons" id="pvpMapButtons">
       ${PVP_MAP_SELECTION_OPTIONS.map(
