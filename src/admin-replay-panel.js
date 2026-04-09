@@ -1,3 +1,5 @@
+import { getPvpMapDefinition, getPvpMapLabel, normalizePvpMapId } from './pvp-map-catalog.mjs';
+
 export function createAdminReplayViewer({ apiRequest, formatDate }) {
   const state = {
     matchId: '',
@@ -69,6 +71,17 @@ export function createAdminReplayViewer({ apiRequest, formatDate }) {
     return player?.displayName || player?.username || String(userId || '-');
   }
 
+  function getReplayMapId() {
+    return normalizePvpMapId(
+      state.content?.mapId ||
+        state.content?.summary?.mapId ||
+        state.detail?.mapId ||
+        state.detail?.match?.mapId ||
+        null,
+      null
+    );
+  }
+
   function stopPlayback() {
     state.playing = false;
     if (state.timer) {
@@ -89,6 +102,10 @@ export function createAdminReplayViewer({ apiRequest, formatDate }) {
   }
 
   function calculateBounds() {
+    const mapId = getReplayMapId();
+    if (mapId) {
+      return { ...getPvpMapDefinition(mapId).arena.bounds };
+    }
     const snapshots = Array.isArray(state.content?.snapshots) ? state.content.snapshots : [];
     const points = snapshots.flatMap((snapshot) => Array.isArray(snapshot?.players) ? snapshot.players : []);
     const xs = points.map((player) => Number(player?.x)).filter(Number.isFinite);
@@ -176,7 +193,14 @@ export function createAdminReplayViewer({ apiRequest, formatDate }) {
       .slice(-16);
 
     state.ui.title.textContent = `回放 ${state.matchId.slice(0, 8)}`;
-    state.ui.subtitle.textContent = [state.detail?.match?.mode || replay?.mode || '-', getReplayStatus(replay)].join(' | ');
+    const replayMapId = getReplayMapId();
+    state.ui.subtitle.textContent = [
+      state.detail?.match?.mode || replay?.mode || '-',
+      replayMapId ? getPvpMapLabel(replayMapId) : null,
+      getReplayStatus(replay)
+    ]
+      .filter(Boolean)
+      .join(' | ');
     state.ui.download.href = `/api/admin/replays/${encodeURIComponent(state.matchId)}/download`;
     state.ui.download.classList.toggle('hidden', !replay?.available);
     state.ui.slider.max = String(Math.max(0, snapshots.length - 1));

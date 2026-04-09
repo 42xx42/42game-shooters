@@ -1,18 +1,27 @@
+import {
+  PVP_DEFAULT_MAP_ID,
+  getPvpMapDefinition,
+  normalizePvpMapId
+} from './pvp-map-catalog.mjs';
+
 export const COMBAT_TICK_RATE = 30;
 export const COMBAT_TICK_MS = Math.round(1000 / COMBAT_TICK_RATE);
 export const SNAPSHOT_TICK_INTERVAL = 2;
 export const RECONNECT_GRACE_MS = 10_000;
 
-export const PVP_COMBAT_ARENA = Object.freeze({
-  width: 26,
-  depth: 18,
-  bounds: Object.freeze({
-    minX: -13,
-    maxX: 13,
-    minZ: -9,
-    maxZ: 9
-  })
-});
+function getCombatMapDefinition(mapId = PVP_DEFAULT_MAP_ID) {
+  return getPvpMapDefinition(mapId).combat;
+}
+
+function getCombatArena(mapId = PVP_DEFAULT_MAP_ID) {
+  return getCombatMapDefinition(mapId).arena;
+}
+
+function getCombatCoverLayout(mapId = PVP_DEFAULT_MAP_ID) {
+  return getCombatMapDefinition(mapId).coverLayout;
+}
+
+export const PVP_COMBAT_ARENA = getCombatArena(PVP_DEFAULT_MAP_ID);
 
 export const PVP_COMBAT_PLAYER = Object.freeze({
   radius: 0.62,
@@ -92,29 +101,7 @@ const TEAM_ORDER = Object.freeze(['p1', 'p2', 'p3', 'p4']);
 const VALID_WEAPON_IDS = new Set(Object.keys(PVP_COMBAT_WEAPONS));
 const VALID_MODES = new Set(Object.keys(PVP_COMBAT_MODES));
 
-export const PVP_COMBAT_COVER_LAYOUT = Object.freeze([
-  { key: 'Tank', x: 0, z: -0.6, rot: Math.PI * 0.6, sizeX: 4.5, sizeZ: 3.0 },
-  { key: 'Barrier_Large', x: -11.2, z: -4.2, rot: Math.PI / 2, sizeX: 3.6, sizeZ: 1.2 },
-  { key: 'Barrier_Large', x: -11.2, z: 4.2, rot: Math.PI / 2, sizeX: 3.6, sizeZ: 1.2 },
-  { key: 'Barrier_Large', x: 11.2, z: -4.2, rot: -Math.PI / 2, sizeX: 3.6, sizeZ: 1.2 },
-  { key: 'Barrier_Large', x: 11.2, z: 4.2, rot: -Math.PI / 2, sizeX: 3.6, sizeZ: 1.2 },
-  { key: 'SackTrench', x: -7.4, z: 0.8, rot: 0, sizeX: 2.4, sizeZ: 1.2 },
-  { key: 'SackTrench', x: 7.4, z: -0.8, rot: Math.PI, sizeX: 2.4, sizeZ: 1.2 },
-  { key: 'Container_Small', x: -10.2, z: -7.2, rot: 0.1, sizeX: 4.2, sizeZ: 2.2 },
-  { key: 'Container_Small', x: 10.2, z: 7.2, rot: -Math.PI + 0.1, sizeX: 4.2, sizeZ: 2.2 },
-  { key: 'Structure_1', x: -10.3, z: 7.1, rot: 0, sizeX: 2.5, sizeZ: 2.5 },
-  { key: 'Structure_1', x: 10.3, z: -7.1, rot: Math.PI, sizeX: 2.5, sizeZ: 2.5 },
-  { key: 'Crate', x: -3.2, z: 0, rot: 0.2, sizeX: 1.2, sizeZ: 1.2 },
-  { key: 'Crate', x: 3.2, z: 0, rot: -0.2, sizeX: 1.2, sizeZ: 1.2 },
-  { key: 'Crate', x: 0, z: 5.1, rot: 0.5, sizeX: 1.2, sizeZ: 1.2 },
-  { key: 'Crate', x: 0, z: -5.1, rot: -0.4, sizeX: 1.2, sizeZ: 1.2 },
-  { key: 'Pallet', x: -6.2, z: -1.6, rot: 0.15, sizeX: 1.4, sizeZ: 1.4 },
-  { key: 'Pallet', x: 6.2, z: 1.6, rot: -0.15, sizeX: 1.4, sizeZ: 1.4 },
-  { key: 'Sofa', x: -8.3, z: 5.9, rot: Math.PI / 4, sizeX: 2.0, sizeZ: 1.0 },
-  { key: 'Sofa', x: 8.3, z: -5.9, rot: -Math.PI / 4, sizeX: 2.0, sizeZ: 1.0 },
-  { key: 'CardboardBoxes_2', x: -2.2, z: -6.6, rot: 0.2, sizeX: 1.1, sizeZ: 1.1 },
-  { key: 'CardboardBoxes_3', x: 2.2, z: 6.6, rot: -0.2, sizeX: 1.1, sizeZ: 1.1 }
-]);
+export const PVP_COMBAT_COVER_LAYOUT = getCombatCoverLayout(PVP_DEFAULT_MAP_ID);
 
 function buildCombatObstacle(entry) {
   const halfX = Math.max(0.1, Number(entry.sizeX || 0) / 2 - 0.08);
@@ -136,20 +123,20 @@ function buildCombatObstacle(entry) {
   });
 }
 
-export const PVP_COMBAT_OBSTACLES = Object.freeze(PVP_COMBAT_COVER_LAYOUT.map(buildCombatObstacle));
+const COMBAT_OBSTACLE_CACHE = new Map();
 
-const MODE_SPAWNS = Object.freeze({
-  duel: Object.freeze([
-    Object.freeze({ x: -10, z: 0 }),
-    Object.freeze({ x: 10, z: 0 })
-  ]),
-  deathmatch: Object.freeze([
-    Object.freeze({ x: -9, z: -2 }),
-    Object.freeze({ x: 9, z: 2 }),
-    Object.freeze({ x: 0, z: -7.2 }),
-    Object.freeze({ x: 0, z: 7.2 })
-  ])
-});
+function getCombatObstacles(mapId = PVP_DEFAULT_MAP_ID) {
+  const normalizedMapId = normalizePvpMapId(mapId, PVP_DEFAULT_MAP_ID);
+  if (!COMBAT_OBSTACLE_CACHE.has(normalizedMapId)) {
+    COMBAT_OBSTACLE_CACHE.set(
+      normalizedMapId,
+      Object.freeze(getCombatCoverLayout(normalizedMapId).map(buildCombatObstacle))
+    );
+  }
+  return COMBAT_OBSTACLE_CACHE.get(normalizedMapId);
+}
+
+export const PVP_COMBAT_OBSTACLES = getCombatObstacles(PVP_DEFAULT_MAP_ID);
 
 function clamp(value, min, max) {
   return Math.min(Math.max(value, min), max);
@@ -215,15 +202,15 @@ function resolveObstacleCollision(player, obstacle) {
   player.z = obstacle.maxZ + radius + 0.0001;
 }
 
-function resolveObstacleCollisions(player) {
+function resolveObstacleCollisions(player, mapId = PVP_DEFAULT_MAP_ID) {
   for (let iteration = 0; iteration < 4; iteration += 1) {
     let collided = false;
-    for (const obstacle of PVP_COMBAT_OBSTACLES) {
+    for (const obstacle of getCombatObstacles(mapId)) {
       if (!circleIntersectsObstacle(player.x, player.z, PVP_COMBAT_PLAYER.radius, obstacle)) {
         continue;
       }
       resolveObstacleCollision(player, obstacle);
-      resolveBounds(player);
+      resolveBounds(player, mapId);
       collided = true;
     }
     if (!collided) {
@@ -285,9 +272,9 @@ function rayObstacleHit(originX, originZ, dirX, dirZ, maxDistance, obstacle) {
   };
 }
 
-function getClosestObstacleHit(originX, originZ, dirX, dirZ, maxDistance) {
+function getClosestObstacleHit(originX, originZ, dirX, dirZ, maxDistance, mapId = PVP_DEFAULT_MAP_ID) {
   let bestHit = null;
-  for (const obstacle of PVP_COMBAT_OBSTACLES) {
+  for (const obstacle of getCombatObstacles(mapId)) {
     const hit = rayObstacleHit(originX, originZ, dirX, dirZ, maxDistance, obstacle);
     if (!hit) continue;
     if (!bestHit || hit.distance < bestHit.distance) {
@@ -322,8 +309,9 @@ function getSeatDefaultYaw(seatIndex = 0) {
   return seatIndex % 2 === 0 ? Math.PI / 2 : -Math.PI / 2;
 }
 
-function getSpawnPool(mode) {
-  return MODE_SPAWNS[mode] || MODE_SPAWNS.duel;
+function getSpawnPool(mode, mapId = PVP_DEFAULT_MAP_ID) {
+  const spawnByMode = getCombatMapDefinition(mapId).spawnByMode;
+  return spawnByMode[mode] || spawnByMode.duel;
 }
 
 function getSpawnOccupants(state, excludeUserKey) {
@@ -360,8 +348,8 @@ function computeSpawnOrientation(spawn, mode, fallbackYaw, occupants = []) {
   return Math.atan2(dx, dz);
 }
 
-function chooseSpawnPlacement(mode, seatIndex, options = {}) {
-  const spawns = getSpawnPool(mode);
+function chooseSpawnPlacement(mode, seatIndex, mapId = PVP_DEFAULT_MAP_ID, options = {}) {
+  const spawns = getSpawnPool(mode, mapId);
   const fallbackIndex = seatIndex % spawns.length;
   const fallbackYaw = getSeatDefaultYaw(seatIndex);
 
@@ -379,6 +367,23 @@ function chooseSpawnPlacement(mode, seatIndex, options = {}) {
     ? options.reservedSpawnIndexes
     : null;
   const occupants = getSpawnOccupants(state, options.excludeUserKey);
+
+  if (!occupants.length) {
+    let spawnIndex = fallbackIndex;
+    if (reservedSpawnIndexes?.has(spawnIndex) && reservedSpawnIndexes.size < spawns.length) {
+      const nextFreeSpawnIndex = spawns.findIndex((_, index) => !reservedSpawnIndexes.has(index));
+      if (nextFreeSpawnIndex >= 0) {
+        spawnIndex = nextFreeSpawnIndex;
+      }
+    }
+    reservedSpawnIndexes?.add(spawnIndex);
+    const spawn = spawns[spawnIndex];
+    return {
+      spawn,
+      spawnIndex,
+      yaw: computeSpawnOrientation(spawn, mode, fallbackYaw, occupants)
+    };
+  }
 
   let bestPlacement = null;
   for (let spawnIndex = 0; spawnIndex < spawns.length; spawnIndex += 1) {
@@ -432,8 +437,8 @@ function chooseSpawnPlacement(mode, seatIndex, options = {}) {
   };
 }
 
-function createPlayerState(user, seatIndex, mode) {
-  const placement = chooseSpawnPlacement(mode, seatIndex);
+function createPlayerState(user, seatIndex, mode, mapId) {
+  const placement = chooseSpawnPlacement(mode, seatIndex, mapId);
   const spawn = placement.spawn;
   return {
     seat: seatIndex,
@@ -473,6 +478,7 @@ function createPlayerState(user, seatIndex, mode) {
     damageDealt: 0,
     damageTaken: 0,
     lives: mode === 'deathmatch' ? PVP_COMBAT_MODES.deathmatch.startLives : 1,
+    mapId,
     lastInput: normalizeCombatInput(),
     lastProcessedInputSeq: 0
   };
@@ -504,7 +510,7 @@ function getWeaponState(player, weaponId = player.weaponId) {
 }
 
 function resetPlayerForSpawn(player, mode, seatIndex = player.seat, options = {}) {
-  const placement = chooseSpawnPlacement(mode, seatIndex, {
+  const placement = chooseSpawnPlacement(mode, seatIndex, options.mapId || player.mapId || PVP_DEFAULT_MAP_ID, {
     state: options.state,
     excludeUserKey: player.userKey,
     reservedSpawnIndexes: options.reservedSpawnIndexes
@@ -625,20 +631,21 @@ function approach(current, target, delta) {
   return current + Math.sign(target - current) * delta;
 }
 
-function resolveBounds(player) {
+function resolveBounds(player, mapId = PVP_DEFAULT_MAP_ID) {
+  const arena = getCombatArena(mapId);
   player.x = clamp(
     player.x,
-    PVP_COMBAT_ARENA.bounds.minX + PVP_COMBAT_PLAYER.radius,
-    PVP_COMBAT_ARENA.bounds.maxX - PVP_COMBAT_PLAYER.radius
+    arena.bounds.minX + PVP_COMBAT_PLAYER.radius,
+    arena.bounds.maxX - PVP_COMBAT_PLAYER.radius
   );
   player.z = clamp(
     player.z,
-    PVP_COMBAT_ARENA.bounds.minZ + PVP_COMBAT_PLAYER.radius,
-    PVP_COMBAT_ARENA.bounds.maxZ - PVP_COMBAT_PLAYER.radius
+    arena.bounds.minZ + PVP_COMBAT_PLAYER.radius,
+    arena.bounds.maxZ - PVP_COMBAT_PLAYER.radius
   );
 }
 
-function separatePlayers(players) {
+function separatePlayers(players, mapId = PVP_DEFAULT_MAP_ID) {
   for (let index = 0; index < players.length; index += 1) {
     for (let inner = index + 1; inner < players.length; inner += 1) {
       const left = players[index];
@@ -663,8 +670,8 @@ function separatePlayers(players) {
       right.x += nx * push;
       right.z += nz * push;
 
-      resolveBounds(left);
-      resolveBounds(right);
+      resolveBounds(left, mapId);
+      resolveBounds(right, mapId);
     }
   }
 }
@@ -718,7 +725,7 @@ function resolveFire(state, attacker, input, events) {
     const dirYaw = attacker.yaw + angle;
     const dirX = Math.sin(dirYaw);
     const dirZ = Math.cos(dirYaw);
-    const obstacleHit = getClosestObstacleHit(originX, originZ, dirX, dirZ, weapon.range);
+    const obstacleHit = getClosestObstacleHit(originX, originZ, dirX, dirZ, weapon.range, state.mapId);
 
     let bestTarget = null;
     let bestHit = null;
@@ -864,7 +871,8 @@ function resolveKill(state, attacker, target, events, context = {}) {
 function respawnPlayer(state, player, events, options = {}) {
   resetPlayerForSpawn(player, state.mode, player.seat, {
     state,
-    reservedSpawnIndexes: options.reservedSpawnIndexes
+    reservedSpawnIndexes: options.reservedSpawnIndexes,
+    mapId: state.mapId
   });
   if (state.mode === 'deathmatch') {
     player.lives = Math.max(1, player.lives);
@@ -887,7 +895,7 @@ function startSuddenDeath(state, contenders, events) {
   if (state.mode === 'duel') {
     state.round += 1;
     state.players.forEach((player, index) => {
-      resetPlayerForSpawn(player, state.mode, index, { state });
+      resetPlayerForSpawn(player, state.mode, index, { state, mapId: state.mapId });
     });
   } else {
     const contenderKeys = new Set(contenders.map((player) => player.userKey));
@@ -902,7 +910,8 @@ function startSuddenDeath(state, contenders, events) {
       }
       resetPlayerForSpawn(player, state.mode, index, {
         state,
-        reservedSpawnIndexes
+        reservedSpawnIndexes,
+        mapId: state.mapId
       });
       player.lives = 1;
     });
@@ -993,7 +1002,7 @@ function updateDuelRoundReset(state, events) {
   state.round += 1;
   state.roundState = 'live';
   state.players.forEach((player, index) => {
-    resetPlayerForSpawn(player, state.mode, index, { state });
+    resetPlayerForSpawn(player, state.mode, index, { state, mapId: state.mapId });
   });
 
   events.push(
@@ -1011,7 +1020,7 @@ function updatePlayerTimers(player) {
   if (player.dashTicks > 0) player.dashTicks -= 1;
 }
 
-function applyMovement(player, input) {
+function applyMovement(player, input, mapId = PVP_DEFAULT_MAP_ID) {
   const axesLength = Math.hypot(input.moveX, input.moveY);
   const forward = getForwardVector(player.yaw);
   const right = getRightVector(player.yaw);
@@ -1038,8 +1047,8 @@ function applyMovement(player, input) {
 
   player.x += player.vx / COMBAT_TICK_RATE;
   player.z += player.vz / COMBAT_TICK_RATE;
-  resolveBounds(player);
-  resolveObstacleCollisions(player);
+  resolveBounds(player, mapId);
+  resolveObstacleCollisions(player, mapId);
 }
 
 function maybeStartDash(player, input) {
@@ -1090,7 +1099,7 @@ function updatePlayer(state, player, input, events) {
   }
 
   maybeStartDash(player, input);
-  applyMovement(player, input);
+  applyMovement(player, input, state.mapId);
   resolveFire(state, player, input, events);
   player.lastInput = input;
 }
@@ -1163,19 +1172,29 @@ export function normalizeCombatInput(input = {}) {
   };
 }
 
-export function createInitialCombatState({ matchId, roomId = null, roomCode = null, mode, players, startedAtMs = Date.now() }) {
+export function createInitialCombatState({
+  matchId,
+  roomId = null,
+  roomCode = null,
+  mode,
+  mapId = PVP_DEFAULT_MAP_ID,
+  players,
+  startedAtMs = Date.now()
+}) {
   const normalizedMode = normalizeCombatMode(mode, 'duel');
+  const normalizedMapId = normalizePvpMapId(mapId, PVP_DEFAULT_MAP_ID);
   const rules = PVP_COMBAT_MODES[normalizedMode];
   const normalizedPlayers = Array.isArray(players) ? players : [];
   const combatPlayers = normalizedPlayers
     .slice(0, rules.capacity)
-    .map((player, index) => createPlayerState(player, index, normalizedMode));
+    .map((player, index) => createPlayerState(player, index, normalizedMode, normalizedMapId));
 
   return {
     matchId: String(matchId || ''),
     roomId: roomId || null,
     roomCode: roomCode || null,
     mode: normalizedMode,
+    mapId: normalizedMapId,
     tick: 0,
     status: 'active',
     roundState: 'live',
@@ -1201,6 +1220,7 @@ export function buildCombatSnapshot(state) {
   return {
     matchId: state.matchId,
     mode: state.mode,
+    mapId: normalizePvpMapId(state.mapId, PVP_DEFAULT_MAP_ID),
     tick: state.tick,
     status: state.status,
     timeLeft: Math.max(0, roundValue(state.timeLeftMs / 1000, 2)),
@@ -1222,10 +1242,7 @@ export function buildCombatSnapshot(state) {
         weaponId: player.weaponId,
         ammo: weaponState?.ammo ?? 0,
         reserve: weaponState?.reserve ?? 0,
-        dashSeconds: roundValue(player.dashTicks / COMBAT_TICK_RATE, 2),
         dashCooldown: roundValue(player.dashCooldownTicks / COMBAT_TICK_RATE, 2),
-        dashDirX: roundValue(player.dashDirX, 4),
-        dashDirZ: roundValue(player.dashDirZ, 4),
         respawnSeconds: roundValue(player.respawnTicks / COMBAT_TICK_RATE, 2),
         reloadSeconds: roundValue((weaponState?.reloadTicks || 0) / COMBAT_TICK_RATE, 2),
         weaponSwitchSeconds: roundValue(player.weaponSwitchTicks / COMBAT_TICK_RATE, 2),
@@ -1246,6 +1263,7 @@ export function buildCombatResult(state, endedReason = state.endedReason || 'com
   return {
     matchId: state.matchId,
     mode: state.mode,
+    mapId: normalizePvpMapId(state.mapId, PVP_DEFAULT_MAP_ID),
     winnerTeam,
     mvpUserId: mvpPlayer?.userId || null,
     endedReason,
@@ -1266,17 +1284,22 @@ export function buildCombatResult(state, endedReason = state.endedReason || 'com
   };
 }
 
-export function predictLocalPlayerState(snapshotPlayer, input, dtSeconds = 1 / COMBAT_TICK_RATE) {
+export function predictLocalPlayerState(
+  snapshotPlayer,
+  input,
+  dtSeconds = 1 / COMBAT_TICK_RATE,
+  mapId = PVP_DEFAULT_MAP_ID
+) {
   const player = {
     x: Number(snapshotPlayer?.x) || 0,
     z: Number(snapshotPlayer?.z) || 0,
     yaw: normalizeAngle(snapshotPlayer?.yaw),
     vx: 0,
     vz: 0,
-    dashTicks: Math.max(0, Math.round((Number(snapshotPlayer?.dashSeconds) || 0) * COMBAT_TICK_RATE)),
+    dashTicks: 0,
     dashCooldownTicks: Math.round((Number(snapshotPlayer?.dashCooldown) || 0) * COMBAT_TICK_RATE),
-    dashDirX: Number.isFinite(Number(snapshotPlayer?.dashDirX)) ? Number(snapshotPlayer.dashDirX) : 0,
-    dashDirZ: Number.isFinite(Number(snapshotPlayer?.dashDirZ)) ? Number(snapshotPlayer.dashDirZ) : 1,
+    dashDirX: 0,
+    dashDirZ: 1,
     alive: Boolean(snapshotPlayer?.alive),
     eliminated: Boolean(snapshotPlayer?.eliminated),
     lastInput: normalizeCombatInput(),
@@ -1292,7 +1315,7 @@ export function predictLocalPlayerState(snapshotPlayer, input, dtSeconds = 1 / C
   const normalizedInput = normalizeCombatInput(input);
   player.yaw = normalizedInput.aimYaw;
   maybeStartDash(player, normalizedInput);
-  applyMovement(player, normalizedInput);
+  applyMovement(player, normalizedInput, mapId);
   return {
     x: roundValue(player.x),
     z: roundValue(player.z),
@@ -1331,7 +1354,7 @@ export function stepCombatState(state, inputByUserKey = new Map()) {
       const input = normalizeCombatInput(inputMap.get(player.userKey) || player.lastInput);
       updatePlayer(state, player, input, events);
     }
-    separatePlayers(state.players);
+    separatePlayers(state.players, state.mapId);
   }
 
   if (state.timeLeftMs <= 0 && !state.suddenDeath && state.status === 'active') {

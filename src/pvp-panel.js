@@ -1,8 +1,15 @@
 import { createPvpReplayViewer } from './pvp-replay-viewer.js?v=20260326-pvp-replay-v3-1';
 import { createPvpReplaySpectator } from './pvp-replay-spectator.js?v=20260326-pvp-replay-v3-1';
+import {
+  PVP_DEFAULT_MAP_SELECTION,
+  PVP_MAP_SELECTION_OPTIONS,
+  getPvpMapLabel,
+  normalizePvpMapSelection
+} from './pvp-map-catalog.mjs';
 
 const STYLE_ID = 'pvpPanelStyles';
 const PANEL_ID = 'pvpPanel';
+const MAP_SELECTION_STORAGE_KEY = 'tinyToonDuel_mapSelection';
 
 const state = {
   session: null,
@@ -20,6 +27,10 @@ const state = {
   eventData: null,
   eventBoard: 'event',
   selectedMode: 'duel',
+  selectedMapSelection: normalizePvpMapSelection(
+    window.localStorage?.getItem?.(MAP_SELECTION_STORAGE_KEY),
+    PVP_DEFAULT_MAP_SELECTION
+  ),
   wsUrl: '',
   socket: null,
   socketConnected: false,
@@ -348,6 +359,14 @@ function ensurePanel() {
       <button class="pvp-mode-btn active" data-mode="duel" type="button">1v1 对决</button>
       <button class="pvp-mode-btn" data-mode="deathmatch" type="button">4人乱斗</button>
     </div>
+    <div class="pvp-heading-row">
+      <span class="pvp-caption">鍦板浘鍊惧ソ</span>
+    </div>
+    <div class="pvp-mode-buttons" id="pvpMapButtons">
+      ${PVP_MAP_SELECTION_OPTIONS.map(
+        (option) => `<button class="pvp-mode-btn${option.id === state.selectedMapSelection ? ' active' : ''}" data-map-selection="${option.id}" type="button">${option.label}</button>`
+      ).join('')}
+    </div>
     <div class="pvp-grid">
       <div class="pvp-subcard">
         <h4>私有房间</h4>
@@ -439,6 +458,7 @@ function getElements() {
     meta: document.getElementById('pvpPanelMeta'),
     socketStatus: document.getElementById('pvpSocketStatus'),
     modeButtons: Array.from(document.querySelectorAll('#pvpModeButtons [data-mode]')),
+    mapButtons: Array.from(document.querySelectorAll('#pvpMapButtons [data-map-selection]')),
     createRoomButton: document.getElementById('pvpCreateRoomBtn'),
     joinRoomCode: document.getElementById('pvpJoinRoomCode'),
     joinRoomButton: document.getElementById('pvpJoinRoomBtn'),
@@ -483,6 +503,32 @@ function getReturnTo() {
 
 function getModeLabel(mode) {
   return mode === 'deathmatch' ? '4人乱斗' : '1v1 对决';
+}
+
+function getMapSelectionLabel(mapSelection) {
+  return getPvpMapLabel(normalizePvpMapSelection(mapSelection, PVP_DEFAULT_MAP_SELECTION));
+}
+
+function persistSelectedMapSelection(mapSelection) {
+  const normalizedSelection = normalizePvpMapSelection(mapSelection, PVP_DEFAULT_MAP_SELECTION);
+  state.selectedMapSelection = normalizedSelection;
+  try {
+    window.localStorage?.setItem?.(MAP_SELECTION_STORAGE_KEY, normalizedSelection);
+  } catch {}
+}
+
+function syncSelectedMapSelection(...sources) {
+  for (const source of sources) {
+    const normalized = normalizePvpMapSelection(
+      source?.mapSelection ?? source?.mapId ?? null,
+      null
+    );
+    if (normalized) {
+      persistSelectedMapSelection(normalized);
+      return normalized;
+    }
+  }
+  return state.selectedMapSelection;
 }
 
 function getRoomStatusLabel(status) {
@@ -829,10 +875,13 @@ function updateMatchStateFromPayload(payload) {
     team: payload.team ?? state.currentMatch?.team ?? null,
     reconnectDeadline: payload.reconnectDeadline || null,
     startedAt: payload.startedAt || state.currentMatch?.startedAt || null,
+    mapSelection: payload.mapSelection || state.currentMatch?.mapSelection || null,
+    mapId: payload.mapId || payload.snapshot?.mapId || state.currentMatch?.mapId || null,
     snapshot: payload.snapshot || state.currentMatch?.snapshot || null,
     scoreboard: payload.scoreboard || state.currentMatch?.scoreboard || null,
     spectatorCount: payload.spectatorCount ?? state.currentMatch?.spectatorCount ?? 0
   };
+  syncSelectedMapSelection(state.currentMatch);
 }
 
 function handleSocketMessage(payload) {
@@ -851,6 +900,7 @@ function handleSocketMessage(payload) {
     } else if (payload.currentMatch?.mode) {
       state.selectedMode = payload.currentMatch.mode;
     }
+    syncSelectedMapSelection(payload.currentRoom, payload.currentQueue, payload.currentMatch);
     render();
     if (state.currentMatch?.matchId) {
       subscribeToCurrentMatch();
@@ -860,12 +910,14 @@ function handleSocketMessage(payload) {
 
   if (payload.type === 'pvp.room.updated') {
     state.currentRoom = payload.room || null;
+    syncSelectedMapSelection(state.currentRoom, state.currentQueue, state.currentMatch);
     render();
     return;
   }
 
   if (payload.type === 'pvp.queue.updated') {
     state.currentQueue = payload.queue || null;
+    syncSelectedMapSelection(state.currentQueue, state.currentRoom, state.currentMatch);
     render();
     return;
   }
@@ -1219,6 +1271,12 @@ function render() {
     button.disabled = state.busy || Boolean(state.currentRoom) || Boolean(state.currentQueue) || hasLiveMatch;
   }
 
+  for (const button of elements.mapButtons) {
+    const active = button.dataset.mapSelection === state.selectedMapSelection;
+    button.classList.toggle('active', active);
+    button.disabled = state.busy || Boolean(state.currentRoom) || Boolean(state.currentQueue) || hasLiveMatch;
+  }
+
   if (!state.session?.authenticated) {
     elements.title.textContent = '在线 PVP 房间';
     elements.meta.textContent = '登录后才能创建房间、加入房间或进入匹配。';
@@ -1274,9 +1332,19 @@ function render() {
       ? '公开匹配当前已关闭，只能使用房间码约战。'
       : `当前未在匹配队列中。可按所选模式进入 ${getModeLabel(state.selectedMode)}。`;
 
+  if (state.currentQueue) {
+    elements.queueMeta.textContent += ` | Map ${getMapSelectionLabel(state.currentQueue.mapSelection)}`;
+  } else if (!state.currentRoom && !hasLiveMatch) {
+    elements.queueMeta.textContent += ` | Map ${getMapSelectionLabel(state.selectedMapSelection)}`;
+  }
+
   elements.roomMeta.textContent = state.currentRoom
     ? `房间码 ${state.currentRoom.roomCode} · ${getModeLabel(state.currentRoom.mode)} · ${state.currentRoom.members.length}/${state.currentRoom.capacity} 人 · ${getRoomStatusLabel(state.currentRoom.status)}`
     : '当前不在任何 PVP 房间中。';
+
+  if (state.currentRoom) {
+    elements.roomMeta.textContent += ` | Map ${getMapSelectionLabel(state.currentRoom.mapSelection)}`;
+  }
 
   if (state.currentRoom?.roomCode) {
     elements.roomCodeWrap.classList.remove('pvp-hidden');
@@ -1340,6 +1408,7 @@ function render() {
       appendMatchLine(elements.matchDetails, `席位：${state.currentMatch.seat ?? '-'}`);
       appendMatchLine(elements.matchDetails, `重连：${getReconnectLabel(state.currentMatch.reconnectDeadline)}`);
     }
+    appendMatchLine(elements.matchDetails, `Map: ${getMapSelectionLabel(state.currentMatch.mapId || state.currentMatch.mapSelection)}`);
     if (state.currentMatch.mode === 'deathmatch') {
       appendMatchLine(elements.matchDetails, `仍在场上：${alivePlayers}/${sortedPlayers.length}`);
       if (leader) {
@@ -1485,6 +1554,7 @@ async function refreshState(options = {}) {
     } else if (state.currentMatch?.mode) {
       state.selectedMode = state.currentMatch.mode;
     }
+    syncSelectedMapSelection(state.currentRoom, state.currentQueue, state.currentMatch);
 
     if (!preserveFeedback) setFeedback('');
     setEventFeedback('');
@@ -1538,6 +1608,13 @@ function bindEvents() {
     });
   }
 
+  for (const button of elements.mapButtons) {
+    button.addEventListener('click', () => {
+      persistSelectedMapSelection(button.dataset.mapSelection);
+      render();
+    });
+  }
+
   for (const button of elements.eventBoardButtons) {
     button.addEventListener('click', () => {
       state.eventBoard = button.dataset.board === 'global' ? 'global' : 'event';
@@ -1578,7 +1655,10 @@ function bindEvents() {
     submitAction(
       () => requestPvpApi('/api/pvp/rooms', {
         method: 'POST',
-        body: JSON.stringify({ mode: state.selectedMode })
+        body: JSON.stringify({
+          mode: state.selectedMode,
+          mapSelection: state.selectedMapSelection
+        })
       }),
       `已创建 ${getModeLabel(state.selectedMode)} 房间。`
     );
@@ -1610,7 +1690,10 @@ function bindEvents() {
     submitAction(
       () => requestPvpApi('/api/pvp/matchmaking/enqueue', {
         method: 'POST',
-        body: JSON.stringify({ mode: state.selectedMode })
+        body: JSON.stringify({
+          mode: state.selectedMode,
+          mapSelection: state.selectedMapSelection
+        })
       }),
       `已进入 ${getModeLabel(state.selectedMode)} 匹配队列。`
     );

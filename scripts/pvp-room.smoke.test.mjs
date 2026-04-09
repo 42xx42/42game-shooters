@@ -548,7 +548,7 @@ test('PVP bootstrap rejects unauthenticated users and disabled beta blocks room 
   assert.equal(createRoomResult.payload.error, 'pvp_disabled');
 });
 
-test('private duel room starts a live match and authoritative snapshots react to client input', async (context) => {
+test('private duel room starts a live match on the selected map and authoritative snapshots react to client input', async (context) => {
   const { baseUrl } = await startPvpApp(context);
   const aliceCookie = await loginAs(baseUrl, USERS.alice);
   const bobCookie = await loginAs(baseUrl, USERS.bob);
@@ -579,11 +579,13 @@ test('private duel room starts a live match and authoritative snapshots react to
     method: 'POST',
     cookie: aliceCookie,
     body: {
-      mode: 'duel'
+      mode: 'duel',
+      mapSelection: 'crossfire'
     }
   });
   assert.equal(createRoomResult.response.status, 200);
   assert.equal(createRoomResult.payload.room.mode, 'duel');
+  assert.equal(createRoomResult.payload.room.mapSelection, 'crossfire');
 
   const roomCode = createRoomResult.payload.room.roomCode;
   assert.ok(roomCode);
@@ -679,6 +681,7 @@ test('private duel room starts a live match and authoritative snapshots react to
   });
   assert.equal(hostStartResult.response.status, 200);
   assert.equal(hostStartResult.payload.match.mode, 'duel');
+  assert.equal(hostStartResult.payload.match.mapId, 'crossfire');
   assert.match(hostStartResult.payload.match.matchId, /^[0-9a-f-]{36}$/u);
 
   const aliceStarting = await aliceWs.waitForType(
@@ -703,6 +706,8 @@ test('private duel room starts a live match and authoritative snapshots react to
   assert.equal(aliceMatchStarted.matchId, bobMatchStarted.matchId);
   assert.equal(aliceMatchStarted.snapshot.players.length, 2);
   assert.equal(bobMatchStarted.snapshot.players.length, 2);
+  assert.equal(aliceMatchStarted.mapId, 'crossfire');
+  assert.equal(aliceMatchStarted.snapshot.mapId, 'crossfire');
   assert.equal(aliceMatchStarted.team, 'p1');
   assert.equal(bobMatchStarted.team, 'p2');
 
@@ -726,6 +731,7 @@ test('private duel room starts a live match and authoritative snapshots react to
 
   const aliceBeforeMove = aliceSnapshot.players.find((player) => player.team === 'p1');
   assert.ok(aliceBeforeMove);
+  assert.equal(aliceSnapshot.mapId, 'crossfire');
 
   aliceWs.sendJson({
     type: 'pvp.match.input',
@@ -1598,6 +1604,7 @@ test('deathmatch replay recording persists replay metadata and artifact files wh
 
   const replay = replayRecords[0].replay;
   assert.equal(replay.mode, 'deathmatch');
+  assert.equal(replay.mapId, 'classic');
   assert.equal(replay.compressed, true);
   assert.match(replay.fileName, /\.ndjson\.gz$/u);
   assert.ok(Number(replay.snapshotCount || 0) > 0);
@@ -1611,6 +1618,7 @@ test('deathmatch replay recording persists replay metadata and artifact files wh
   assert.equal(replayDetailResult.response.status, 200);
   assert.equal(replayDetailResult.payload.matchId, matchId);
   assert.equal(replayDetailResult.payload.replay.matchId, matchId);
+  assert.equal(replayDetailResult.payload.match.mapId, 'classic');
   assert.equal(replayDetailResult.payload.records.length, 4);
 
   const replayContentResult = await apiJson(baseUrl, `/api/admin/replays/${matchId}/content`, {
@@ -1619,6 +1627,8 @@ test('deathmatch replay recording persists replay metadata and artifact files wh
   assert.equal(replayContentResult.response.status, 200);
   assert.equal(replayContentResult.payload.matchId, matchId);
   assert.equal(replayContentResult.payload.content.replay.matchId, matchId);
+  assert.equal(replayContentResult.payload.content.mapId, 'classic');
+  assert.equal(replayContentResult.payload.content.summary.mapId, 'classic');
   assert.ok(replayContentResult.payload.content.summary.snapshotCount > 0);
   assert.ok(replayContentResult.payload.content.snapshots.length > 0);
   assert.ok(replayContentResult.payload.content.events.length > 0);
@@ -1704,18 +1714,21 @@ test('matchmaking creates duel and deathmatch rooms with service-side room owner
     method: 'POST',
     cookie: aliceCookie,
     body: {
-      mode: 'duel'
+      mode: 'duel',
+      mapSelection: 'random'
     }
   });
   assert.equal(duelQueueAlice.response.status, 200);
   assert.equal(duelQueueAlice.payload.queue.mode, 'duel');
+  assert.equal(duelQueueAlice.payload.queue.mapSelection, 'random');
   assert.equal(duelQueueAlice.payload.room, null);
 
   const duelQueueBob = await apiJson(baseUrl, '/api/pvp/matchmaking/enqueue', {
     method: 'POST',
     cookie: bobCookie,
     body: {
-      mode: 'duel'
+      mode: 'duel',
+      mapSelection: 'classic'
     }
   });
   assert.equal(duelQueueBob.response.status, 200);
@@ -1723,6 +1736,7 @@ test('matchmaking creates duel and deathmatch rooms with service-side room owner
   assert.equal(duelQueueBob.payload.room.mode, 'duel');
   assert.equal(duelQueueBob.payload.room.capacity, 2);
   assert.equal(duelQueueBob.payload.room.source, 'matchmaking');
+  assert.equal(duelQueueBob.payload.room.mapSelection, 'classic');
 
   const duelFoundForAlice = await aliceWs.waitForType(
     'pvp.match.found',
@@ -1734,6 +1748,12 @@ test('matchmaking creates duel and deathmatch rooms with service-side room owner
   );
   assert.equal(duelFoundForAlice.room.members.length, 2);
   assert.equal(duelFoundForBob.room.members.length, 2);
+  assert.equal(duelFoundForAlice.room.mapSelection, 'classic');
+
+  const duelBootstrapAlice = await apiJson(baseUrl, '/api/pvp/bootstrap', {
+    cookie: aliceCookie
+  });
+  assert.equal(duelBootstrapAlice.payload.currentRoom.mapSelection, 'classic');
 
   await apiJson(baseUrl, '/api/pvp/matchmaking/enqueue', {
     method: 'POST',

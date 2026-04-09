@@ -154,6 +154,7 @@ export function createPvpReplaySpectator({ apiRequest, onOpenAnalysisMode } = {}
     return {
       matchId: state.matchId,
       mode: state.mode,
+      mapId: snapshot?.mapId || state.content?.mapId || state.content?.summary?.mapId || null,
       role: 'spectator',
       snapshot,
       replay: buildReplayMeta()
@@ -175,6 +176,7 @@ export function createPvpReplaySpectator({ apiRequest, onOpenAnalysisMode } = {}
       ...(state.content?.result || {}),
       matchId: state.matchId,
       mode: state.mode,
+      mapId: state.content?.result?.mapId || state.content?.mapId || state.content?.summary?.mapId || null,
       role: 'spectator',
       replay: buildReplayMeta()
     };

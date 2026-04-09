@@ -7,6 +7,7 @@ import { pipeline } from 'node:stream/promises';
 import { createGzip, gunzipSync } from 'node:zlib';
 
 import { createPvpService, normalizePvpConfig } from './pvp.mjs';
+import { normalizePvpMapId } from '../src/pvp-map-catalog.mjs';
 
 const SESSION_COOKIE = 'shooters_session';
 const DEFAULT_SESSION_TTL_MS = 14 * 24 * 60 * 60 * 1000;
@@ -1128,6 +1129,7 @@ function summarizeReplayRecord(item) {
           : 'missing',
     matchId: item.matchId ? String(item.matchId) : null,
     mode: typeof item.mode === 'string' ? item.mode : null,
+    mapId: normalizePvpMapId(item.mapId, null),
     format: typeof item.format === 'string' ? item.format : null,
     relativePath,
     fileName,
@@ -1293,6 +1295,11 @@ function buildReplayContentSummary({ meta, snapshots, events, result, records, m
     eventTypes[event.type] = (eventTypes[event.type] || 0) + 1;
   }
 
+  const mapId = normalizePvpMapId(
+    meta?.mapId || result?.mapId || snapshots[0]?.mapId || replay?.mapId || null,
+    null
+  );
+
   return {
     schemaVersion: 1,
     recordCount: Array.isArray(records) ? records.length : 0,
@@ -1306,6 +1313,7 @@ function buildReplayContentSummary({ meta, snapshots, events, result, records, m
       Number.isFinite(startedAtMs) && Number.isFinite(Number(lastServerTime))
         ? calculateReplayTimelineSeconds(lastServerTime, startedAtMs)
         : null,
+    mapId,
     winnerTeam: result?.winnerTeam || null,
     endedReason: result?.endedReason || null,
     eventTypes,
@@ -1356,10 +1364,12 @@ function buildReplayContentPayload(replay, records, matchRecords) {
     matchRecords,
     replay
   });
+  const mapId = normalizePvpMapId(summary.mapId || meta?.mapId || result?.mapId || replay?.mapId || null, null);
 
   return {
     replay: summarizeReplayRecord(replay),
     meta,
+    mapId,
     players,
     snapshots,
     events,
@@ -1392,6 +1402,7 @@ function buildReplayDetailPayload(replay, matchRecords) {
     );
   const replaySummary = summarizeReplayRecord(replay);
   const primaryRecord = normalizedRecords[0] || null;
+  const mapId = normalizePvpMapId(replaySummary?.mapId || null, null);
   const players = mergeReplayPlayerDirectory(
     [],
     [],
@@ -1407,9 +1418,11 @@ function buildReplayDetailPayload(replay, matchRecords) {
 
   return {
     matchId: replaySummary?.matchId || null,
+    mapId,
     replay: replaySummary,
     match: {
       mode: replaySummary?.mode || primaryRecord?.summary?.gameMode || null,
+      mapId,
       roomCode: null,
       source: null,
       startedAt: primaryRecord?.startedAt || null,
@@ -2800,6 +2813,7 @@ export function createApp(options = {}) {
           status: writeError ? 'failed' : 'ready',
           matchId: context.matchId,
           mode,
+          mapId: context.mapId || null,
           format,
           relativePath,
           fileName: path.posix.basename(relativePath),
@@ -4903,7 +4917,8 @@ export function createApp(options = {}) {
       const result = await pvpService.createRoom({
         userKey: getUserKey(payload.user),
         user: summarizeUser(payload.user),
-        mode: body.mode
+        mode: body.mode,
+        mapSelection: body.mapSelection
       });
       sendJson(res, 200, result, getPvpCorsHeaders(req));
     } catch (error) {
@@ -5023,7 +5038,8 @@ export function createApp(options = {}) {
       const result = await pvpService.enqueue({
         userKey: getUserKey(payload.user),
         user: summarizeUser(payload.user),
-        mode: body.mode
+        mode: body.mode,
+        mapSelection: body.mapSelection
       });
       sendJson(res, 200, result, getPvpCorsHeaders(req));
     } catch (error) {

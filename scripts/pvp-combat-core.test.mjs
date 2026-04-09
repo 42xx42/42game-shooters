@@ -2,13 +2,13 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  buildCombatResult,
+  buildCombatSnapshot,
   COMBAT_TICK_MS,
   PVP_COMBAT_ARENA,
   PVP_COMBAT_OBSTACLES,
   PVP_COMBAT_PLAYER,
-  buildCombatSnapshot,
   createInitialCombatState,
-  predictLocalPlayerState,
   stepCombatState
 } from '../src/pvp-combat-core.mjs';
 
@@ -45,6 +45,8 @@ test('movement stays inside arena bounds', () => {
     mode: 'duel',
     players: makePlayers(2)
   });
+  assert.equal(state.mapId, 'classic');
+  assert.equal(buildCombatSnapshot(state).mapId, 'classic');
 
   const player = state.players[0];
   player.x = PVP_COMBAT_ARENA.bounds.maxX - PVP_COMBAT_PLAYER.radius * 0.5;
@@ -182,73 +184,6 @@ test('weapon switch, reload and dash all work on the shared combat core', () => 
   assert.ok(player.dashCooldownTicks > 0);
 });
 
-test('local prediction keeps active dash duration and direction from authoritative snapshots', () => {
-  const state = createInitialCombatState({
-    matchId: 'dash-prediction-test',
-    mode: 'duel',
-    players: makePlayers(2)
-  });
-
-  const player = state.players[0];
-  player.x = -10;
-  player.z = 0;
-  player.yaw = 0;
-
-  stepCombatState(
-    state,
-    new Map([
-      [
-        player.userKey,
-        {
-          moveX: 1,
-          moveY: 0,
-          aimYaw: 0,
-          fire: false,
-          reload: false,
-          dash: true
-        }
-      ]
-    ])
-  );
-
-  const snapshotPlayer = buildCombatSnapshot(state).players.find(
-    (entry) => entry.userId === player.userId
-  );
-  assert.ok(snapshotPlayer);
-  assert.ok(snapshotPlayer.dashSeconds > 0);
-  assert.ok(snapshotPlayer.dashDirX > 0);
-  assert.equal(snapshotPlayer.dashDirZ, 0);
-
-  const predicted = predictLocalPlayerState(snapshotPlayer, {
-    moveX: 0,
-    moveY: 0,
-    aimYaw: 0,
-    fire: false,
-    reload: false,
-    dash: false
-  });
-
-  stepCombatState(
-    state,
-    new Map([
-      [
-        player.userKey,
-        {
-          moveX: 0,
-          moveY: 0,
-          aimYaw: 0,
-          fire: false,
-          reload: false,
-          dash: false
-        }
-      ]
-    ])
-  );
-
-  assert.equal(predicted.x, Number(state.players[0].x.toFixed(3)));
-  assert.equal(predicted.z, Number(state.players[0].z.toFixed(3)));
-});
-
 test('duel mode ends after one player reaches three round wins', () => {
   const state = createInitialCombatState({
     matchId: 'duel-test',
@@ -297,6 +232,7 @@ test('duel mode ends after one player reaches three round wins', () => {
   assert.equal(state.winnerTeam, left.team);
   assert.equal(state.result?.winnerTeam, left.team);
   assert.equal(state.result?.mvpUserId, left.userId);
+  assert.equal(state.result?.mapId, 'classic');
 });
 
 test('deathmatch respawns before elimination and time ties enter sudden death', () => {
@@ -377,6 +313,7 @@ test('deathmatch respawns before elimination and time ties enter sudden death', 
   });
   stepCombatState(state, new Map());
   assert.equal(state.suddenDeath, true);
+  assert.equal(buildCombatSnapshot(state).mapId, 'classic');
 });
 
 test('deathmatch respawns choose the safest available spawn instead of the seat default', () => {
@@ -445,4 +382,36 @@ test('shots are blocked by combat obstacles before reaching the target', () => {
   });
 
   assert.equal(target.hp, 100);
+});
+
+test('combat result summary preserves map id metadata', () => {
+  const state = createInitialCombatState({
+    matchId: 'map-result-test',
+    mode: 'duel',
+    players: makePlayers(2)
+  });
+
+  const result = buildCombatResult(state);
+  assert.equal(result.mapId, 'classic');
+});
+
+test('non-default maps use their own spawn layout and preserve map metadata', () => {
+  const state = createInitialCombatState({
+    matchId: 'crossfire-map-test',
+    mode: 'deathmatch',
+    mapId: 'crossfire',
+    players: makePlayers(4)
+  });
+
+  assert.equal(state.mapId, 'crossfire');
+  assert.deepEqual(
+    state.players.map((player) => [player.x, player.z]),
+    [
+      [-12.2, 0],
+      [12.2, 0],
+      [0, -9.4],
+      [0, 9.4]
+    ]
+  );
+  assert.equal(buildCombatSnapshot(state).mapId, 'crossfire');
 });

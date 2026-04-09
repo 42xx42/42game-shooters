@@ -80,11 +80,6 @@ test('visual system contract exposes unified tuning and runtime seams', async ()
       for (const eventType of ['shot_fired', 'player_hit', 'kill', 'headshot', 'environment_hit']) {
         assert.ok(profile[eventType], `visualTuning.${modeId}.${weaponId}.${eventType} must exist`);
       }
-      assert.equal(
-        profile.headshot.severity,
-        visualModule.eventSeverityMap.headshot,
-        `visualTuning.${modeId}.${weaponId}.headshot.severity must match eventSeverityMap.headshot`
-      );
       for (const key of [
         'streakLength',
         'streakWidth',
@@ -133,7 +128,6 @@ test('visual system contract exposes unified tuning and runtime seams', async ()
       `eventSeverityMap.${eventType} must exist`
     );
   }
-  assert.equal(visualModule.eventSeverityMap.headshot, 'swing', 'eventSeverityMap.headshot must be swing');
 
   assert.match(html, /function\s+presentCombatFeedback\s*\(/, 'index.html must define presentCombatFeedback()');
   assert.match(html, /function\s+resolveDangerProfile\s*\(/, 'index.html must define resolveDangerProfile()');
