@@ -15,6 +15,14 @@ import {
   SNAPSHOT_TICK_INTERVAL,
   stepCombatState
 } from '../src/pvp-combat-core.mjs';
+import {
+  PVP_DEFAULT_MAP_SELECTION,
+  PVP_MAP_SELECTION_RANDOM,
+  isCompatiblePvpMapSelection,
+  normalizePvpMapSelection,
+  resolvePreferredPvpMapSelection,
+  resolvePvpMapSelection
+} from '../src/pvp-map-catalog.mjs';
 
 const WS_MAGIC = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11';
 const ROOM_CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -64,6 +72,10 @@ export function normalizePvpMode(value, fallback = 'duel') {
     return normalized;
   }
   return fallback;
+}
+
+export function normalizePvpMapSelectionInput(value, fallback = PVP_DEFAULT_MAP_SELECTION) {
+  return normalizePvpMapSelection(value, fallback);
 }
 
 export function normalizePvpConfig(input) {
@@ -204,6 +216,8 @@ function summarizeRoom(room) {
     roomId: room.roomId,
     roomCode: room.roomCode,
     mode: room.mode,
+    mapSelection: normalizePvpMapSelectionInput(room.mapSelection, PVP_DEFAULT_MAP_SELECTION),
+    mapId: room.mapId || null,
     capacity: room.capacity,
     source: room.source,
     status: computeRoomStatus(room),
@@ -221,10 +235,22 @@ function summarizeQueue(entry, estimatedSize = 0) {
 
   return {
     mode: entry.mode,
+    mapSelection: normalizePvpMapSelectionInput(entry.mapSelection, PVP_DEFAULT_MAP_SELECTION),
     queuedAt: entry.queuedAt,
     status: entry.status || 'queued',
     estimatedSize
   };
+}
+
+function resolveRoomMapSelection(mapSelection, fallback = PVP_DEFAULT_MAP_SELECTION) {
+  return normalizePvpMapSelectionInput(mapSelection, fallback);
+}
+
+function resolveMatchMapId(mapSelection, seed = '') {
+  return resolvePvpMapSelection(resolveRoomMapSelection(mapSelection), {
+    preferredMapId: null,
+    seed
+  });
 }
 
 function toPublicConfig(config) {
@@ -641,6 +667,8 @@ export function createPvpService(options = {}) {
       roomId: runtime.roomId,
       roomCode: runtime.roomCode,
       mode: runtime.mode,
+      mapSelection: runtime.mapSelection,
+      mapId: runtime.mapId || runtime.state.mapId || null,
       status: runtime.state.status,
       source: runtime.source,
       role,
@@ -660,6 +688,8 @@ export function createPvpService(options = {}) {
       type: 'pvp.match.started',
       matchId: runtime.matchId,
       mode: runtime.mode,
+      mapSelection: runtime.mapSelection,
+      mapId: runtime.mapId || runtime.state.mapId || null,
       roomId: runtime.roomId,
       roomCode: runtime.roomCode,
       status: runtime.state.status,
@@ -677,6 +707,7 @@ export function createPvpService(options = {}) {
   function buildMatchSnapshotPayload(runtime) {
     return {
       type: 'pvp.match.snapshot',
+      mapSelection: runtime.mapSelection,
       ...buildCombatSnapshot(runtime.state),
       serverTime: runtime.state.startedAtMs + runtime.state.tick * COMBAT_TICK_MS,
       scoreboard: runtime.lastScoreboard,
@@ -783,12 +814,14 @@ export function createPvpService(options = {}) {
     }
   }
 
-  function createRoomInternal({ userKey, user, mode, source = 'private' }) {
+  function createRoomInternal({ userKey, user, mode, mapSelection = PVP_DEFAULT_MAP_SELECTION, source = 'private' }) {
     const now = getNowIso();
     const room = {
       roomId: randomUUID(),
       roomCode: createRoomCode(rooms),
       mode,
+      mapSelection: resolveRoomMapSelection(mapSelection),
+      mapId: null,
       source,
       capacity: getCapacityForMode(mode),
       hostUserKey: userKey,
@@ -823,6 +856,7 @@ export function createPvpService(options = {}) {
 
     room.currentMatchId = null;
     room.isStarting = false;
+    room.mapId = null;
     touchRoom(room);
 
     if (room.source === 'matchmaking') {
@@ -848,6 +882,8 @@ export function createPvpService(options = {}) {
         roomId: runtime.roomId,
         roomCode: runtime.roomCode,
         source: runtime.source,
+        mapSelection: runtime.mapSelection,
+        mapId: runtime.mapId,
         startedAt: runtime.startedAt,
         endedAt: getNowIso(),
         players: runtime.state.players.map((player) => ({
@@ -889,6 +925,8 @@ export function createPvpService(options = {}) {
           type: 'pvp.match.aborted',
           matchId: runtime.matchId,
           mode: runtime.mode,
+          mapSelection: runtime.mapSelection,
+          mapId: runtime.mapId || runtime.state.mapId || null,
           role: getRuntimeRoleForUser(runtime, userKey) || 'player',
           reason: options.reason || 'match_aborted',
           result
@@ -900,6 +938,8 @@ export function createPvpService(options = {}) {
           type: 'pvp.match.ended',
           matchId: runtime.matchId,
           mode: runtime.mode,
+          mapSelection: runtime.mapSelection,
+          mapId: runtime.mapId || runtime.state.mapId || null,
           role: getRuntimeRoleForUser(runtime, userKey) || 'player',
           result
         });
@@ -940,11 +980,15 @@ export function createPvpService(options = {}) {
       ...member.user,
       userKey: member.userKey
     }));
+    const mapSelection = resolveRoomMapSelection(room.mapSelection, PVP_DEFAULT_MAP_SELECTION);
+    const mapId = resolveMatchMapId(mapSelection, room.roomId || room.roomCode || room.hostUserKey || '');
     const runtime = {
       matchId: randomUUID(),
       roomId: room.roomId,
       roomCode: room.roomCode,
       mode: room.mode,
+      mapSelection,
+      mapId,
       source: room.source,
       startedAt: getNowIso(),
       state: createInitialCombatState({
@@ -952,6 +996,7 @@ export function createPvpService(options = {}) {
         roomId: room.roomId,
         roomCode: room.roomCode,
         mode: room.mode,
+        mapId,
         players,
         startedAtMs: getNowMs()
       }),
@@ -986,6 +1031,8 @@ export function createPvpService(options = {}) {
       roomId: room.roomId,
       roomCode: room.roomCode,
       mode: room.mode,
+      mapSelection,
+      mapId,
       source: room.source,
       startedAt: runtime.startedAt,
       config: normalizedConfig,
@@ -1002,6 +1049,8 @@ export function createPvpService(options = {}) {
       roomId: room.roomId,
       roomCode: room.roomCode,
       mode: room.mode,
+      mapSelection,
+      mapId,
       source: room.source,
       startedAt: runtime.startedAt,
       players: runtime.state.players.map((player) => ({
@@ -1017,6 +1066,7 @@ export function createPvpService(options = {}) {
 
     liveMatches.set(runtime.matchId, runtime);
     room.currentMatchId = runtime.matchId;
+    room.mapId = mapId;
     for (const member of room.members) {
       member.isReady = false;
       matchIdByUser.set(member.userKey, runtime.matchId);
@@ -1025,7 +1075,7 @@ export function createPvpService(options = {}) {
     return runtime;
   }
 
-  async function createRoom({ userKey, user, mode }) {
+  async function createRoom({ userKey, user, mode, mapSelection }) {
     const config = await readConfig();
     ensurePvpEnabled(config);
 
@@ -1033,6 +1083,12 @@ export function createPvpService(options = {}) {
     if (!normalizedMode) {
       throw createPvpError('invalid_mode', 400);
     }
+    const requestedMapSelection = normalizePvpMapSelectionInput(mapSelection, null);
+    if (mapSelection !== undefined && mapSelection !== null && !requestedMapSelection) {
+      throw createPvpError('invalid_map_selection', 400);
+    }
+    const normalizedMapSelection =
+      requestedMapSelection || normalizePvpMapSelectionInput(PVP_DEFAULT_MAP_SELECTION, PVP_DEFAULT_MAP_SELECTION);
     ensureModeAllowed(config, normalizedMode);
     ensureNotInLiveMatch(userKey);
 
@@ -1049,6 +1105,7 @@ export function createPvpService(options = {}) {
       userKey,
       user,
       mode: normalizedMode,
+      mapSelection: normalizedMapSelection,
       source: 'private'
     });
 
@@ -1290,6 +1347,44 @@ export function createPvpService(options = {}) {
     };
   }
 
+  function findCompatibleQueueGroup(queue, capacity) {
+    if (!Array.isArray(queue) || queue.length < capacity) {
+      return null;
+    }
+
+    for (let startIndex = 0; startIndex < queue.length; startIndex += 1) {
+      const matchedIndexes = [startIndex];
+      const selections = [queue[startIndex].mapSelection];
+
+      for (let index = startIndex + 1; index < queue.length && matchedIndexes.length < capacity; index += 1) {
+        const nextSelection = queue[index].mapSelection;
+        if (!matchedIndexes.every((matchedIndex) => isCompatiblePvpMapSelection(queue[matchedIndex].mapSelection, nextSelection))) {
+          continue;
+        }
+
+        const preferredSelection = resolvePreferredPvpMapSelection(
+          [...selections, nextSelection],
+          PVP_MAP_SELECTION_RANDOM
+        );
+        if (!preferredSelection) {
+          continue;
+        }
+
+        matchedIndexes.push(index);
+        selections.push(nextSelection);
+      }
+
+      if (matchedIndexes.length === capacity) {
+        return {
+          matchedIndexes,
+          mapSelection: resolvePreferredPvpMapSelection(selections, PVP_MAP_SELECTION_RANDOM) || PVP_DEFAULT_MAP_SELECTION
+        };
+      }
+    }
+
+    return null;
+  }
+
   function maybeMatchmake(mode, config) {
     const queue = queueByMode[mode];
     const capacity = getCapacityForMode(mode);
@@ -1298,54 +1393,63 @@ export function createPvpService(options = {}) {
       return [];
     }
 
-    if (rooms.size >= config.maxActiveRooms) {
-      return [];
-    }
+    const matchedUserKeys = [];
+    while (rooms.size < config.maxActiveRooms) {
+      const group = findCompatibleQueueGroup(queue, capacity);
+      if (!group) {
+        break;
+      }
 
-    const matchedEntries = queue.splice(0, capacity);
-    for (const entry of matchedEntries) {
-      queueEntryByUser.delete(entry.userKey);
-    }
+      const matchedEntries = group.matchedIndexes.map((index) => queue[index]);
+      for (const index of [...group.matchedIndexes].sort((left, right) => right - left)) {
+        queue.splice(index, 1);
+      }
+      for (const entry of matchedEntries) {
+        queueEntryByUser.delete(entry.userKey);
+      }
 
-    const room = createRoomInternal({
-      userKey: matchedEntries[0].userKey,
-      user: matchedEntries[0].user,
-      mode,
-      source: 'matchmaking'
-    });
-
-    room.members = [];
-    for (const [index, entry] of matchedEntries.entries()) {
-      const member = createMember(
-        entry.userKey,
-        entry.user,
-        getNowIso(),
-        hasLiveConnection(entry.userKey) ? 'online' : 'offline'
-      );
-      member.isHost = index === 0;
-      room.members.push(member);
-      roomMembershipByUser.set(entry.userKey, room.roomId);
-    }
-    refreshHost(room);
-    touchRoom(room);
-
-    const roomSummary = summarizeRoom(room);
-    for (const entry of matchedEntries) {
-      emitToUser(entry.userKey, {
-        type: 'pvp.queue.updated',
-        queue: null
+      const room = createRoomInternal({
+        userKey: matchedEntries[0].userKey,
+        user: matchedEntries[0].user,
+        mode,
+        mapSelection: group.mapSelection,
+        source: 'matchmaking'
       });
-      emitToUser(entry.userKey, {
-        type: 'pvp.match.found',
-        room: roomSummary
-      });
-    }
-    emitRoomUpdated(room);
 
-    return matchedEntries.map((entry) => entry.userKey);
+      room.members = [];
+      for (const [index, entry] of matchedEntries.entries()) {
+        const member = createMember(
+          entry.userKey,
+          entry.user,
+          getNowIso(),
+          hasLiveConnection(entry.userKey) ? 'online' : 'offline'
+        );
+        member.isHost = index === 0;
+        room.members.push(member);
+        roomMembershipByUser.set(entry.userKey, room.roomId);
+        matchedUserKeys.push(entry.userKey);
+      }
+      refreshHost(room);
+      touchRoom(room);
+
+      const roomSummary = summarizeRoom(room);
+      for (const entry of matchedEntries) {
+        emitToUser(entry.userKey, {
+          type: 'pvp.queue.updated',
+          queue: null
+        });
+        emitToUser(entry.userKey, {
+          type: 'pvp.match.found',
+          room: roomSummary
+        });
+      }
+      emitRoomUpdated(room);
+    }
+
+    return matchedUserKeys;
   }
 
-  async function enqueue({ userKey, user, mode }) {
+  async function enqueue({ userKey, user, mode, mapSelection }) {
     const config = await readConfig();
     ensurePvpEnabled(config);
     ensureMatchmakingEnabled(config);
@@ -1354,6 +1458,12 @@ export function createPvpService(options = {}) {
     if (!normalizedMode) {
       throw createPvpError('invalid_mode', 400);
     }
+    const requestedMapSelection = normalizePvpMapSelectionInput(mapSelection, null);
+    if (mapSelection !== undefined && mapSelection !== null && !requestedMapSelection) {
+      throw createPvpError('invalid_map_selection', 400);
+    }
+    const normalizedMapSelection =
+      requestedMapSelection || normalizePvpMapSelectionInput(PVP_DEFAULT_MAP_SELECTION, PVP_DEFAULT_MAP_SELECTION);
     ensureModeAllowed(config, normalizedMode);
     ensureNotInLiveMatch(userKey);
 
@@ -1368,6 +1478,7 @@ export function createPvpService(options = {}) {
       userKey,
       user: normalizeUser(user),
       mode: normalizedMode,
+      mapSelection: normalizedMapSelection,
       queuedAt: getNowIso(),
       status: 'queued'
     };
@@ -1611,7 +1722,8 @@ export function createPvpService(options = {}) {
           await enqueue({
             userKey,
             user,
-            mode: message.mode || message.payload?.mode
+            mode: message.mode || message.payload?.mode,
+            mapSelection: message.mapSelection || message.payload?.mapSelection
           });
           return;
         }

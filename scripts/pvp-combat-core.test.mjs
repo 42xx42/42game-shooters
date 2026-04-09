@@ -2,6 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  buildCombatResult,
+  buildCombatSnapshot,
   COMBAT_TICK_MS,
   PVP_COMBAT_ARENA,
   PVP_COMBAT_OBSTACLES,
@@ -43,6 +45,8 @@ test('movement stays inside arena bounds', () => {
     mode: 'duel',
     players: makePlayers(2)
   });
+  assert.equal(state.mapId, 'classic');
+  assert.equal(buildCombatSnapshot(state).mapId, 'classic');
 
   const player = state.players[0];
   player.x = PVP_COMBAT_ARENA.bounds.maxX - PVP_COMBAT_PLAYER.radius * 0.5;
@@ -228,6 +232,7 @@ test('duel mode ends after one player reaches three round wins', () => {
   assert.equal(state.winnerTeam, left.team);
   assert.equal(state.result?.winnerTeam, left.team);
   assert.equal(state.result?.mvpUserId, left.userId);
+  assert.equal(state.result?.mapId, 'classic');
 });
 
 test('deathmatch respawns before elimination and time ties enter sudden death', () => {
@@ -308,6 +313,7 @@ test('deathmatch respawns before elimination and time ties enter sudden death', 
   });
   stepCombatState(state, new Map());
   assert.equal(state.suddenDeath, true);
+  assert.equal(buildCombatSnapshot(state).mapId, 'classic');
 });
 
 test('deathmatch respawns choose the safest available spawn instead of the seat default', () => {
@@ -376,4 +382,36 @@ test('shots are blocked by combat obstacles before reaching the target', () => {
   });
 
   assert.equal(target.hp, 100);
+});
+
+test('combat result summary preserves map id metadata', () => {
+  const state = createInitialCombatState({
+    matchId: 'map-result-test',
+    mode: 'duel',
+    players: makePlayers(2)
+  });
+
+  const result = buildCombatResult(state);
+  assert.equal(result.mapId, 'classic');
+});
+
+test('non-default maps use their own spawn layout and preserve map metadata', () => {
+  const state = createInitialCombatState({
+    matchId: 'crossfire-map-test',
+    mode: 'deathmatch',
+    mapId: 'crossfire',
+    players: makePlayers(4)
+  });
+
+  assert.equal(state.mapId, 'crossfire');
+  assert.deepEqual(
+    state.players.map((player) => [player.x, player.z]),
+    [
+      [-12.2, 0],
+      [12.2, 0],
+      [0, -9.4],
+      [0, 9.4]
+    ]
+  );
+  assert.equal(buildCombatSnapshot(state).mapId, 'crossfire');
 });

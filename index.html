@@ -1478,7 +1478,7 @@
     .menuStats {
       width: 100%;
       display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
+      grid-template-columns: repeat(4, minmax(0, 1fr));
       gap: 10px;
       margin: 18px 0 16px;
     }
@@ -2339,12 +2339,20 @@
                   <span>鑺傚</span>
                   <strong id="menuTempoStat">Crisp 1v1 gunfeel</strong>
                 </div>
+                <div class="menuStat">
+                  <span>Map</span>
+                  <strong id="menuMapStat">Classic</strong>
+                </div>
               </div>
 	            <div class="modeSelect">
 	              <button class="modeBtn" data-mode="duel">1v1 瀵瑰喅</button>
 	              <button class="modeBtn" data-mode="deathmatch">4浜?涔辨枟</button>
 	            </div>
 	            <div class="rules" id="modeRules">浜斿眬涓夎儨 路 1:45 鏃堕棿闄愬埗 路 鐖嗙偢妗舵棤宸埆浼ゅ</div>
+	            <div class="difficultySelect" id="mapSelect">
+	              <div class="difficultyLabel" id="mapLabel">Map</div>
+	              <div class="difficultyButtons" id="mapButtons"></div>
+	            </div>
 	            <div class="difficultySelect" id="difficultySelect">
 	              <div class="difficultyLabel" id="difficultyLabel">AI 闅惧害</div>
 	              <div class="difficultyButtons">
@@ -2524,34 +2532,24 @@
         visualTuning
       },
       {
-        PVP_COMBAT_ARENA,
-        PVP_COMBAT_COVER_LAYOUT,
         predictLocalPlayerState
+      },
+      {
+        PVP_DEFAULT_MAP_ID,
+        PVP_DEFAULT_MAP_SELECTION,
+        PVP_MAP_SELECTION_OPTIONS,
+        getPvpMapDefinition,
+        getPvpMapLabel,
+        normalizePvpMapSelection,
+        resolvePvpMapSelection
       }
     ] = await Promise.all([
       import(`./src/visual-tuning.js?v=${encodeURIComponent(ASSET_VERSION)}`),
-      import(`./src/pvp-combat-core.mjs?v=${encodeURIComponent(ASSET_VERSION)}`)
+      import(`./src/pvp-combat-core.mjs?v=${encodeURIComponent(ASSET_VERSION)}`),
+      import(`./src/pvp-map-catalog.mjs?v=${encodeURIComponent(ASSET_VERSION)}`)
     ]);
 
-    const BASE_ARENA = {
-      width: 26,
-      depth: 18,
-      bounds: { minX: -13, maxX: 13, minZ: -9, maxZ: 9 },
-      ground: { width: 36, depth: 26 }
-    };
-
-    const LIVE_PVP_ARENA_FALLBACK_SIZES = Object.freeze({
-      Tank: [4.5, 2.5, 3.0],
-      Container_Small: [4.2, 2.0, 2.2],
-      Barrier_Large: [3.6, 1.2, 1.2],
-      Crate: [1.2, 1.2, 1.2],
-      SackTrench: [2.4, 0.8, 1.2],
-      Sofa: [2.0, 1.0, 1.0],
-      Structure_1: [2.5, 2.0, 2.5],
-      Pallet: [1.4, 0.2, 1.4],
-      CardboardBoxes_2: [1.1, 0.8, 1.1],
-      CardboardBoxes_3: [1.1, 0.8, 1.1]
-    });
+    const DEFAULT_MAP_DEFINITION = getPvpMapDefinition(PVP_DEFAULT_MAP_ID);
 
     const CONFIG = {
       render: {
@@ -2560,9 +2558,9 @@
         maxDpr: 2
       },
       arena: {
-        width: BASE_ARENA.width,
-        depth: BASE_ARENA.depth,
-        bounds: { ...BASE_ARENA.bounds }
+        width: DEFAULT_MAP_DEFINITION.arena.width,
+        depth: DEFAULT_MAP_DEFINITION.arena.depth,
+        bounds: { ...DEFAULT_MAP_DEFINITION.arena.bounds }
       },
       camera: {
         fov: 50,
@@ -2622,7 +2620,7 @@
 	          tracer: 0xffd24d
 	        },
         smg: {
-          name: '鍐查攱鏋?,
+          name: 'SMG',
           fireRate: 10,
           fireRateAI: 6.0,
           damage: 8,
@@ -2641,7 +2639,7 @@
           tracer: 0xf7f7ff
         },
         shotgun: {
-          name: '闇板脊鏋?,
+          name: 'Shotgun',
           fireRate: 1.2,
           fireRateAI: 1.0,
           damage: 12,
@@ -2716,10 +2714,10 @@
 	      difficulty: {
 	        order: ['novice', 'easy', 'normal', 'hard'],
 	        labels: {
-	          novice: '鏂版墜',
-	          easy: '绠€鍗?,
-	          normal: '鏅€?,
-	          hard: '鍥伴毦'
+          novice: 'Novice',
+          easy: 'Easy',
+          normal: 'Normal',
+          hard: 'Hard'
 	        },
 	        byMode: { duel: 'novice', deathmatch: 'easy' }, // 'novice' | 'easy' | 'normal' | 'hard'
 	        presets: {
@@ -2777,12 +2775,6 @@
     };
 
     const MODEL_YAW_OFFSET = 0; // adjust if character forward differs from -Z
-    const SPAWN_POINTS = [
-      new THREE.Vector3(-9, 0, 0),
-      new THREE.Vector3(9, 0, 0),
-      new THREE.Vector3(0, 0, -7),
-      new THREE.Vector3(0, 0, 7)
-    ];
 
     const canvas = document.getElementById('scene');
     const canvasWrap = document.getElementById('canvasWrap');
@@ -2830,7 +2822,10 @@
     const menuModeStatEl = document.getElementById('menuModeStat');
     const menuDifficultyStatEl = document.getElementById('menuDifficultyStat');
     const menuTempoStatEl = document.getElementById('menuTempoStat');
+    const menuMapStatEl = document.getElementById('menuMapStat');
 		    const modeButtons = Array.from(document.querySelectorAll('.modeBtn'));
+	    const mapLabelEl = document.getElementById('mapLabel');
+	    const mapButtonsWrap = document.getElementById('mapButtons');
 	    const difficultyLabelEl = document.getElementById('difficultyLabel');
 	    const difficultyButtons = Array.from(document.querySelectorAll('.difficultyBtn'));
 	    const nearMissFlash = document.getElementById('nearMissFlash');
@@ -2872,7 +2867,9 @@
       mouse: { x: 0, y: 0, down: false, justPressed: false, lastRawMoveAt: 0 }
     };
 
+    const MAP_SELECTION_STORAGE_KEY = 'tinyToonDuel_mapSelection';
     const MOBILE_WEAPON_ORDER = ['pistol', 'smg', 'shotgun'];
+    let mapButtons = [];
 
     const mobileState = {
       active: false,
@@ -2898,6 +2895,8 @@
 	      gameMode: 'duel',
 	      activeGameMode: null,
 	      activeDifficulty: null,
+      selectedMapSelection: PVP_DEFAULT_MAP_SELECTION,
+      activeMapId: PVP_DEFAULT_MAP_ID,
       showLeaderboard: false,
       timeLeft: CONFIG.match.totalTime,
       round: 1,
@@ -2924,6 +2923,7 @@
       active: false,
       matchId: null,
       mode: null,
+      mapId: null,
       role: 'player',
       isSpectator: false,
       isReplay: false,
@@ -3149,8 +3149,8 @@
       combatFeedKind: 'idle',
       combatFeedSeverity: 'calm',
       combatFeedEmphasis: 'standard',
-      combatFeedLabel: '鎴樺満绋冲畾',
-      combatFeedMeta: '鍏堣瀵燂紝鍐嶅帇鏋€?,
+      combatFeedLabel: 'Combat Ready',
+      combatFeedMeta: 'Observe first, then fire.',
       combatFeedLift: 8,
       combatFeedScale: 1,
       combatPulseTimer: 0,
@@ -3247,6 +3247,14 @@
 	        }
 	      } catch {}
 	    }
+
+      state.selectedMapSelection = normalizePvpMapSelection(
+        localStorage.getItem(MAP_SELECTION_STORAGE_KEY),
+        PVP_DEFAULT_MAP_SELECTION
+      );
+      state.activeMapId = resolvePvpMapSelection(state.selectedMapSelection, {
+        preferredMapId: PVP_DEFAULT_MAP_ID
+      });
 
 	    init();
 
@@ -3417,7 +3425,7 @@
 
       pvpPlaceholderRefreshBtn?.addEventListener('click', async () => {
         if (!window.shootersPvp?.refresh) {
-          showBanner('PVP 闈㈡澘杩樺湪鍔犺浇锛岃绋嶅悗鍐嶈瘯銆?, { skipFeedback: true });
+          showBanner('PVP panel is still loading. Try again in a moment.', { skipFeedback: true });
           return;
         }
 
@@ -3435,7 +3443,7 @@
 
       pvpPlaceholderLeaveBtn?.addEventListener('click', async () => {
         if (!window.shootersPvp?.surrenderMatch) {
-          showBanner('PVP 闈㈡澘杩樺湪鍔犺浇锛岃绋嶅悗鍐嶈瘯銆?, { skipFeedback: true });
+          showBanner('PVP panel is still loading. Try again in a moment.', { skipFeedback: true });
           return;
         }
         window.shootersPvp.surrenderMatch();
@@ -3520,8 +3528,8 @@
         if (currentMatch?.matchId && state.mode === 'menu' && !livePvp.active) {
           showBanner(
             currentMatch.role === 'spectator'
-              ? '妫€娴嬪埌鍙户缁殑 PVP 瑙傝禌锛屾鍦ㄦ仮澶嶃€?
-              : '妫€娴嬪埌鍙噸杩炵殑鍦ㄧ嚎 PVP 瀵瑰眬锛屾鍦ㄦ仮澶嶃€?,
+              ? 'Resuming your PVP spectator session.'
+              : 'Resuming your live PVP match.',
             { skipFeedback: true }
           );
         }
@@ -4681,265 +4689,6 @@
 	      world.arenaLayout = null;
 	    }
 
-    function buildArena() {
-      const manifest = assets.manifest.assets.toonshooter;
-      const ground = new THREE.Mesh(
-        new THREE.PlaneGeometry(BASE_ARENA.ground.width * (CONFIG.arena.width / BASE_ARENA.width), BASE_ARENA.ground.depth * (CONFIG.arena.depth / BASE_ARENA.depth)),
-        new THREE.MeshStandardMaterial({ color: COLORS.dust, roughness: 0.9, metalness: 0.05 })
-      );
-      ground.rotation.x = -Math.PI / 2;
-      ground.receiveShadow = true;
-      world.scene.add(ground);
-      world.arenaObjects.push(ground);
-
-	      const border = new THREE.LineSegments(
-	        new THREE.EdgesGeometry(new THREE.PlaneGeometry(CONFIG.arena.width, CONFIG.arena.depth)),
-	        new THREE.LineBasicMaterial({ color: COLORS.dustDark })
-	      );
-	      border.rotation.x = -Math.PI / 2;
-	      border.position.y = 0.02;
-	      world.scene.add(border);
-	      world.arenaObjects.push(border);
-	      world.arenaDecor = [];
-
-      // Main cover placements - collide-able obstacles
-      const placements = [
-        // Center major occluder - Tank (permanent cover)
-        { key: 'Tank', pos: [0, 0, -0.6], rot: Math.PI * 0.6, collide: true },
-
-        // Safe spawn cover (permanent)
-        { key: 'Barrier_Large', pos: [-11.2, 0, -4.2], rot: Math.PI / 2, collide: true },
-        { key: 'Barrier_Large', pos: [-11.2, 0, 4.2], rot: Math.PI / 2, collide: true },
-        { key: 'Barrier_Large', pos: [11.2, 0, -4.2], rot: -Math.PI / 2, collide: true },
-        { key: 'Barrier_Large', pos: [11.2, 0, 4.2], rot: -Math.PI / 2, collide: true },
-
-        // Permanent lane anchors
-        { key: 'SackTrench', pos: [-7.4, 0, 0.8], rot: 0, collide: true },
-        { key: 'SackTrench', pos: [7.4, 0, -0.8], rot: Math.PI, collide: true },
-        { key: 'Container_Small', pos: [-10.2, 0, -7.2], rot: 0.1, collide: true },
-        { key: 'Container_Small', pos: [10.2, 0, 7.2], rot: -Math.PI + 0.1, collide: true },
-        { key: 'Structure_1', pos: [-10.3, 0, 7.1], rot: 0, collide: true },
-        { key: 'Structure_1', pos: [10.3, 0, -7.1], rot: Math.PI, collide: true },
-
-        // Mid-map destructible cover (opens up over the match)
-        { key: 'Crate', pos: [-3.2, 0, 0], rot: 0.2, collide: true },
-        { key: 'Crate', pos: [3.2, 0, 0], rot: -0.2, collide: true },
-        { key: 'Crate', pos: [0, 0, 5.1], rot: 0.5, collide: true },
-        { key: 'Crate', pos: [0, 0, -5.1], rot: -0.4, collide: true },
-        { key: 'Pallet', pos: [-6.2, 0, -1.6], rot: 0.15, collide: true },
-        { key: 'Pallet', pos: [6.2, 0, 1.6], rot: -0.15, collide: true },
-        { key: 'Sofa', pos: [-8.3, 0, 5.9], rot: Math.PI / 4, collide: true },
-        { key: 'Sofa', pos: [8.3, 0, -5.9], rot: -Math.PI / 4, collide: true },
-        { key: 'CardboardBoxes_2', pos: [-2.2, 0, -6.6], rot: 0.2, collide: true },
-        { key: 'CardboardBoxes_3', pos: [2.2, 0, 6.6], rot: -0.2, collide: true }
-      ];
-
-      // Decorative props - non-colliding clutter for visual density
-      const decorativePlacements = [
-        // Cardboard boxes clusters scattered around
-        { key: 'CardboardBoxes_1', pos: [-11, 0, 5], rot: 0.3 },
-        { key: 'CardboardBoxes_2', pos: [11, 0, -5], rot: -0.4 },
-        { key: 'CardboardBoxes_3', pos: [-2, 0, -7], rot: 0.1 },
-        { key: 'CardboardBoxes_4', pos: [2, 0, 7], rot: -0.2 },
-        { key: 'CardboardBoxes_1', pos: [5, 0, -6], rot: 0.6 },
-        { key: 'CardboardBoxes_2', pos: [-5, 0, 6], rot: -0.5 },
-        // Tires scattered
-        { key: 'Debris_Tires', pos: [4, 0, -3], rot: 0 },
-        { key: 'Debris_Tires', pos: [-4, 0, -5], rot: Math.PI / 3 },
-        { key: 'Debris_Tires', pos: [8, 0, 2], rot: 0.8 },
-        // Traffic cones marking areas
-        { key: 'TrafficCone', pos: [-2, 0, -2], rot: 0 },
-        { key: 'TrafficCone', pos: [2, 0, 2], rot: 0 },
-        { key: 'TrafficCone', pos: [-9, 0, 0], rot: 0.2 },
-        { key: 'TrafficCone', pos: [9, 0, 0], rot: -0.1 },
-        { key: 'TrafficCone', pos: [0, 0, -8], rot: 0.3 },
-        { key: 'TrafficCone', pos: [0, 0, 8], rot: -0.2 },
-        // Debris piles
-        { key: 'Debris_Pile', pos: [-10, 0, 2], rot: 0.5 },
-        { key: 'Debris_Pile', pos: [10, 0, -2], rot: -0.3 },
-        { key: 'Debris_Pile', pos: [3, 0, -4], rot: 0.7 },
-        // Paper debris scattered
-        { key: 'Debris_Papers_1', pos: [-1, 0, -3], rot: 0.8 },
-        { key: 'Debris_Papers_2', pos: [1, 0, 3], rot: -0.6 },
-        { key: 'Debris_Papers_3', pos: [-6, 0, -2], rot: 0.4 },
-        // Gas cans
-        { key: 'GasCan', pos: [-7, 0, -4], rot: 0.2 },
-        { key: 'GasCan', pos: [7, 0, 4], rot: -0.3 },
-        // Wood planks
-        { key: 'WoodPlanks', pos: [-3, 0, 4], rot: 0.6 },
-        { key: 'WoodPlanks', pos: [3, 0, -4], rot: -0.5 },
-        // Broken pallets
-        { key: 'Pallet_Broken', pos: [9, 0, -4], rot: 0.3 },
-        { key: 'Pallet_Broken', pos: [-9, 0, 4], rot: -0.4 },
-        // Pipes near edges
-        { key: 'Pipes', pos: [-12, 0, 0], rot: Math.PI / 2 },
-        { key: 'Pipes', pos: [12, 0, 0], rot: -Math.PI / 2 },
-        // Trash containers at edges
-        { key: 'TrashContainer', pos: [-12, 0, -6], rot: 0.1 },
-        { key: 'TrashContainer_Open', pos: [12, 0, 6], rot: -0.1 },
-        // Street lights for atmosphere
-        { key: 'StreetLight', pos: [-12, 0, 4], rot: 0 },
-        { key: 'StreetLight', pos: [12, 0, -4], rot: Math.PI },
-        // Signs
-        { key: 'Sign', pos: [-11, 0, 7], rot: -0.2 },
-        { key: 'Sign', pos: [11, 0, -7], rot: 0.3 }
-      ];
-
-      const fallbackSizes = {
-        Tank: [4.5, 2.5, 3.0],
-        Debris_BrokenCar: [3.5, 1.5, 2.0],
-        Container_Small: [4.2, 2.0, 2.2],
-        Barrier_Large: [3.6, 1.2, 1.2],
-        Crate: [1.2, 1.2, 1.2],
-        SackTrench: [2.4, 0.8, 1.2],
-        Sofa: [2.0, 1.0, 1.0],
-        Structure_1: [2.5, 2.0, 2.5],
-        Pallet: [1.4, 0.2, 1.4],
-        CardboardBoxes_1: [1.1, 0.8, 1.1],
-        CardboardBoxes_2: [1.1, 0.8, 1.1],
-        CardboardBoxes_3: [1.1, 0.8, 1.1],
-        CardboardBoxes_4: [1.1, 0.8, 1.1]
-      };
-
-      // Place colliding cover
-	      placements.forEach((item) => {
-	        const path = manifest.environment[item.key];
-	        const clone = cloneAsset(path);
-	        const isFallback = !clone;
-	        const activeVisual = isFallback ? 'placeholder' : 'gltf';
-	        const visuals = { gltf: null, placeholder: null };
-	        const fbSize = fallbackSizes[item.key] || [2, 1.5, 2];
-	        const root = isFallback
-	          ? new THREE.Mesh(
-	            new THREE.BoxGeometry(...fbSize),
-	            new THREE.MeshStandardMaterial({ color: COLORS.steel, roughness: 0.7, metalness: 0.1 })
-	          )
-	          : normalizeToHeight(clone.root, null);
-	        if (isFallback) root.position.y = fbSize[1] / 2;
-	        visuals[activeVisual] = isFallback ? markPlaceholder(root) : root;
-	        root.position.set(item.pos[0], root.position.y, item.pos[2]);
-	        root.rotation.y = item.rot;
-	        root.traverse?.((child) => {
-	          if (child.isMesh) {
-	            child.castShadow = true;
-            child.receiveShadow = true;
-          }
-        });
-        world.scene.add(root);
-        world.arenaObjects.push(root);
-
-	        if (item.collide !== false) {
-	          const box = computeMeshBounds(root);
-	          const inset = 0.08;
-		          const typeCfg = CONFIG.cover.types[item.key] || null;
-		          const cover = {
-	            key: item.key,
-	            assetPath: path,
-	            mesh: root,
-	            visuals,
-	            activeVisual,
-	            spawnPos: root.position.clone(),
-	            spawnRotY: root.rotation.y,
-		            minX: box.min.x + inset,
-		            maxX: box.max.x - inset,
-		            minZ: box.min.z + inset,
-	            maxZ: box.max.z - inset,
-	            minY: box.min.y,
-	            maxY: box.max.y,
-	            blocksLoS: true,
-	            active: true,
-	            destructible: Boolean(typeCfg),
-            hp: typeCfg ? typeCfg.hp : null,
-            maxHp: typeCfg ? typeCfg.hp : null,
-            kickable: Boolean(typeCfg),
-            flashTimer: 0,
-            originalMaterials: null,
-            colliderOffsets: null,
-            kickState: null
-          };
-          cacheCoverColliderOffsets(cover);
-          world.cover.push(cover);
-        }
-      });
-
-	      // Place decorative (non-colliding) props
-	      decorativePlacements.forEach((item) => {
-	        const path = manifest.environment[item.key];
-	        if (!path) return; // Skip if asset doesn't exist
-	        const clone = cloneAsset(path);
-	        const activeVisual = clone ? 'gltf' : 'placeholder';
-	        const visuals = { gltf: null, placeholder: null };
-	        const root = clone
-	          ? normalizeToHeight(clone.root, null)
-	          : markPlaceholder(
-	            new THREE.Mesh(
-	              new THREE.BoxGeometry(0.9, 0.6, 0.9),
-	              new THREE.MeshStandardMaterial({ color: COLORS.dustDark, roughness: 0.85, metalness: 0.05 })
-	            )
-	          );
-	        visuals[activeVisual] = root;
-	        root.position.set(item.pos[0], root.position.y, item.pos[2]);
-	        root.rotation.y = item.rot;
-	        root.traverse?.((child) => {
-	          if (child.isMesh) {
-	            child.castShadow = true;
-	            child.receiveShadow = true;
-	          }
-	        });
-	        world.scene.add(root);
-	        world.arenaObjects.push(root);
-	        world.arenaDecor.push({ kind: 'prop', key: item.key, assetPath: path, mesh: root, visuals, activeVisual });
-	      });
-
-	      const fencePath = manifest.environment.Fence_Long;
-	      const fenceClone = cloneAsset(fencePath);
-	      const fenceSegments = [
-	        { pos: [0, 0, CONFIG.arena.bounds.minZ - 0.4], rot: 0, len: CONFIG.arena.width + 0.8 },
-	        { pos: [0, 0, CONFIG.arena.bounds.maxZ + 0.4], rot: Math.PI, len: CONFIG.arena.width + 0.8 },
-	        { pos: [CONFIG.arena.bounds.minX - 0.4, 0, 0], rot: Math.PI / 2, len: CONFIG.arena.depth + 0.8 },
-	        { pos: [CONFIG.arena.bounds.maxX + 0.4, 0, 0], rot: -Math.PI / 2, len: CONFIG.arena.depth + 0.8 }
-	      ];
-	      const fenceModel = fenceClone ? normalizeToHeight(fenceClone.root, null) : null;
-	      fenceSegments.forEach((seg) => {
-	        const cloneFence = fenceModel ? fenceModel.clone(true) : null;
-	        const activeVisual = cloneFence ? 'gltf' : 'placeholder';
-	        const visuals = { gltf: null, placeholder: null };
-	        const fence = cloneFence
-	          ? cloneFence
-	          : markPlaceholder(
-	            new THREE.Mesh(
-	              new THREE.BoxGeometry(seg.len, 1.1, 0.18),
-	              new THREE.MeshStandardMaterial({ color: COLORS.steel, roughness: 0.8, metalness: 0.05 })
-	            )
-	          );
-	        visuals[activeVisual] = fence;
-	        if (cloneFence) {
-	          fence.position.set(seg.pos[0], 0, seg.pos[2]);
-	        } else {
-	          fence.position.set(seg.pos[0], 0.55, seg.pos[2]);
-	        }
-	        fence.rotation.y = seg.rot;
-	        fence.scale.setScalar(1.1);
-	        world.scene.add(fence);
-	        world.arenaObjects.push(fence);
-	        world.arenaDecor.push({
-	          kind: 'fence',
-	          key: 'Fence_Long',
-	          assetPath: fencePath,
-	          mesh: fence,
-	          visuals,
-	          activeVisual,
-	          placeholderLength: seg.len
-	        });
-	      });
-
-	      world.arenaLayout = { decorativePlacements, fallbackSizes, fenceSegments };
-
-	      spawnBarrels();
-
-	      buildCoverNodes();
-	    }
-
     function cacheCoverColliderOffsets(cover) {
       if (!cover.mesh) return;
       const box = computeMeshBounds(cover.mesh);
@@ -4966,76 +4715,6 @@
       }
       if (typeof cover.colliderOffsets.maxY === 'number') {
         cover.maxY = cover.mesh.position.y + cover.colliderOffsets.maxY;
-      }
-    }
-
-    function spawnBarrels() {
-      const manifest = assets.manifest.assets.toonshooter;
-      const barrelPath = manifest.environment.ExplodingBarrel;
-      const barrelClone = cloneAsset(barrelPath);
-      const barrelPositions = [
-        new THREE.Vector3(-8.2, 0, -6.5),
-        new THREE.Vector3(8.2, 0, 6.5),
-        new THREE.Vector3(0, 0, 7.0)
-      ];
-
-	      barrelPositions.forEach((pos) => {
-	        const barrelRoot = barrelClone ? normalizeToHeight(barrelClone.root.clone(true), null) : null;
-	        const fallback = new THREE.Mesh(
-	          new THREE.CylinderGeometry(0.45, 0.45, 1.2, 12),
-	          new THREE.MeshStandardMaterial({ color: COLORS.warning, roughness: 0.4, metalness: 0.2 })
-	        );
-	        const mesh = barrelRoot || fallback;
-	        const activeVisual = barrelRoot ? 'gltf' : 'placeholder';
-	        const visuals = { gltf: null, placeholder: null };
-	        mesh.position.copy(pos);
-	        if (!barrelRoot) mesh.position.y = 0.6;
-	        if (!barrelRoot) markPlaceholder(mesh);
-	        visuals[activeVisual] = mesh;
-	        mesh.castShadow = true;
-	        mesh.receiveShadow = true;
-	        world.scene.add(mesh);
-	        world.barrels.push({
-	          assetPath: barrelPath,
-	          mesh,
-	          position: mesh.position,
-	          visuals,
-	          activeVisual,
-	          spawnPos: pos.clone(),
-	          velocity: new THREE.Vector3(),
-	          hp: CONFIG.barrel.hp,
-	          alive: true,
-          radius: CONFIG.barrel.radius,
-          isRolling: false,
-          rollTimer: 0
-        });
-      });
-    }
-
-    function buildCoverNodes() {
-      world.nodes = [];
-      const offset = 1.1;
-      world.cover.forEach((box) => {
-        if (box.active === false) return;
-        const cx = (box.minX + box.maxX) / 2;
-        const cz = (box.minZ + box.maxZ) / 2;
-        const hx = (box.maxX - box.minX) / 2 + offset;
-        const hz = (box.maxZ - box.minZ) / 2 + offset;
-        addNode(cx + hx, cz);
-        addNode(cx - hx, cz);
-        addNode(cx, cz + hz);
-        addNode(cx, cz - hz);
-      });
-
-      addNode(-8, 0);
-      addNode(8, 0);
-      addNode(0, -7);
-      addNode(0, 7);
-
-      function addNode(x, z) {
-        if (x < CONFIG.arena.bounds.minX + 1 || x > CONFIG.arena.bounds.maxX - 1) return;
-        if (z < CONFIG.arena.bounds.minZ + 1 || z > CONFIG.arena.bounds.maxZ - 1) return;
-        world.nodes.push(new THREE.Vector3(x, 0, z));
       }
     }
 
@@ -5097,10 +4776,6 @@
       });
       world.entities = [];
       world.mixers = [];
-    }
-
-    function getSpawnPoints(count) {
-      return SPAWN_POINTS.slice(0, count).map((point) => point.clone());
     }
 
 	    function createCharacter({ id, path, guns, team, color, spawn }) {
@@ -5387,15 +5062,50 @@
       bestTimeEnd.textContent = bestText;
     }
 
+    function getSelectedMapSelection() {
+      return normalizePvpMapSelection(state.selectedMapSelection, PVP_DEFAULT_MAP_SELECTION);
+    }
+
+    function resolveCurrentMapId(options = {}) {
+      return resolvePvpMapSelection(getSelectedMapSelection(), {
+        preferredMapId: options.preserveActive === false ? null : state.activeMapId,
+        seed: options.seed || `${state.gameMode}:${state.activeGameMode || 'menu'}:${getSelectedMapSelection()}`
+      });
+    }
+
+    function getActiveMapDefinition(mapId = state.activeMapId || resolveCurrentMapId()) {
+      return getPvpMapDefinition(mapId || PVP_DEFAULT_MAP_ID);
+    }
+
 	    function setupMenuModes() {
 	      modeButtons.forEach((button) => {
 	        button.addEventListener('click', () => {
 	          setGameMode(button.dataset.mode);
 	        });
 	      });
+        setupMenuMapSelection();
 	      setupDifficultySelect();
 	      setGameMode(state.gameMode);
 	    }
+
+    function setupMenuMapSelection() {
+      if (!mapButtonsWrap) return;
+      mapButtonsWrap.replaceChildren(
+        ...PVP_MAP_SELECTION_OPTIONS.map((option) => {
+          const button = document.createElement('button');
+          button.className = 'difficultyBtn';
+          button.type = 'button';
+          button.dataset.mapSelection = option.id;
+          button.textContent = option.label;
+          button.addEventListener('click', () => {
+            setMapSelection(option.id);
+          });
+          return button;
+        })
+      );
+      mapButtons = Array.from(mapButtonsWrap.querySelectorAll('[data-map-selection]'));
+      updateMapSelectionUI();
+    }
 
 	    function setupDifficultySelect() {
 	      if (!difficultyButtons.length) return;
@@ -5459,6 +5169,19 @@
 	      updateDifficultyUI();
 	    }
 
+    function updateMapSelectionUI() {
+      const currentSelection = getSelectedMapSelection();
+      mapButtons.forEach((button) => {
+        button.classList.toggle('active', button.dataset.mapSelection === currentSelection);
+      });
+      if (mapLabelEl) {
+        mapLabelEl.textContent = `Map ${getPvpMapLabel(currentSelection)}`;
+      }
+      if (menuMapStatEl) {
+        menuMapStatEl.textContent = getPvpMapLabel(currentSelection);
+      }
+    }
+
 	    function updateDifficultyUI() {
 	      const current = getDifficultyForMode(state.gameMode);
 	      difficultyButtons.forEach((button) => {
@@ -5474,6 +5197,23 @@
       }
 	    }
 
+    function setMapSelection(mapSelection, options = {}) {
+      const normalizedSelection = normalizePvpMapSelection(mapSelection, PVP_DEFAULT_MAP_SELECTION);
+      const changed = state.selectedMapSelection !== normalizedSelection;
+      state.selectedMapSelection = normalizedSelection;
+      localStorage.setItem(MAP_SELECTION_STORAGE_KEY, normalizedSelection);
+      updateMapSelectionUI();
+      updateMenuModeCopy();
+      if (changed && options.rebuild !== false && !livePvp.active) {
+        applyGameMode(state.gameMode, {
+          mapId: resolveCurrentMapId({
+            preserveActive: false,
+            seed: `${normalizedSelection}:${Date.now()}`
+          })
+        });
+      }
+    }
+
 	    function setGameMode(modeId) {
 	      if (!CONFIG.gameModes[modeId]) return;
 	      state.gameMode = modeId;
@@ -5482,6 +5222,7 @@
 	      });
 	      updateMenuModeCopy();
 	      updateDifficultyUI();
+        updateMapSelectionUI();
         syncHudVisualState();
 	    }
 
@@ -5489,27 +5230,29 @@
       if (!modeSubtitleEl || !modeRulesEl) return;
       const currentDifficulty = getDifficultyForMode(state.gameMode);
       const difficultyLabel = getDifficultyLabel(currentDifficulty);
+      const mapLabel = getPvpMapLabel(getSelectedMapSelection());
       const menuProfile = getMenuVisualProfile(state.gameMode);
       const effectiveMode = getEffectiveGameMode(state.gameMode);
       if (menuEyebrowEl) menuEyebrowEl.textContent = menuProfile.eyebrow;
       if (menuChipEl) menuChipEl.textContent = menuProfile.badge;
       if (menuModeStatEl) menuModeStatEl.textContent = effectiveMode?.name || state.gameMode;
       if (menuTempoStatEl) menuTempoStatEl.textContent = menuProfile.tempo;
+      if (menuMapStatEl) menuMapStatEl.textContent = mapLabel;
       if (menuEyebrowEl) menuEyebrowEl.style.color = menuProfile.accent;
       if (menuChipEl) menuChipEl.style.color = menuProfile.support;
       if (state.gameMode === 'deathmatch') {
         const dm = getEffectiveGameMode('deathmatch');
         modeSubtitleEl.textContent = currentDifficulty === 'novice'
-          ? '鏇村鏉剧殑涔辨枟缁冧範鍦猴紝鍏堢啛鎮夎蛋浣嶃€佹崲寮瑰拰鐖嗙偢妗惰妭濂忋€?
+          ? '閺囨潙顔旈弶鍓ф畱娑旇鲸鏋熺紒鍐х瘎閸︾尨绱濋崗鍫㈠暃閹铔嬫担宥冣偓浣瑰床瀵懓鎷伴悥鍡欏仮濡楁儼濡總蹇嬧偓?'
           : currentDifficulty === 'easy'
-            ? '淇濈暀涔辨枟鐑椆鎰燂紝浣嗘妸鐢熷懡鍜?AI 鍘嬪姏涓嬭皟涓€妗ｃ€?
-            : '澶氫汉娣锋垬绔炴妧鍦猴紝娲诲埌鏈€鍚庣殑瑙掕壊鑾疯儨銆?;
-        modeRulesEl.textContent = `${dm.playerCount} 鍚嶈鑹?路 ${dm.lives} 鏉″懡 路 1:45 鏃堕棿闄愬埗 路 褰撳墠 AI锛?{difficultyLabel}`;
+            ? '娣囨繄鏆€娑旇鲸鏋熼悜顓㈡閹扮噦绱濇担鍡樺Ω閻㈢喎鎳￠崪?AI 閸樺濮忔稉瀣殶娑撯偓濡楋絻鈧?'
+            : '婢舵矮姹夊ǎ閿嬪灛缁旂偞濡ч崷鐚寸礉濞茶鍩岄張鈧崥搴ｆ畱鐟欐帟澹婇懢鐤劏閵?';
+        modeRulesEl.textContent = `${dm.playerCount} 閸氬秷顫楅懝?璺?${dm.lives} 閺夆€虫嚒 璺?1:45 閺冨爼妫块梽鎰煑 璺?瑜版挸澧?AI閿?{difficultyLabel} | Map ${mapLabel}`;
       } else {
         modeSubtitleEl.textContent = currentDifficulty === 'novice'
-          ? '鏇存參銆佹洿鍑嗐€佹洿瀹藉鐨?1v1锛屽绗竴娆′笂鎵嬫洿鍙嬪ソ銆?
-          : '寰瀷绔炴妧鍦?1v1锛屽鏋妭濂忔竻鏅帮紝閫傚悎閫愭鎻愰毦銆?;
-        modeRulesEl.textContent = `浜斿眬涓夎儨 路 1:45 鏃堕棿闄愬埗 路 鐖嗙偢妗跺弻鏂圭敓鏁?路 褰撳墠 AI锛?{difficultyLabel}`;
+          ? '閺囧瓨鍙冮妴浣规纯閸戝棎鈧焦娲跨€硅棄顔愰惃?1v1閿涘苯顕粭顑跨濞嗏€茬瑐閹靛娲块崣瀣偨閵?'
+          : '瀵邦喖鐎风粩鐐村Η閸?1v1閿涘苯顕弸顏囧Ν婵傚繑绔婚弲甯礉闁倸鎮庨柅鎰劄閹绘劙姣﹂妴?';
+        modeRulesEl.textContent = `娴滄柨鐪稉澶庡劏 璺?1:45 閺冨爼妫块梽鎰煑 璺?閻栧棛鍋㈠璺哄蓟閺傚湱鏁撻弫?璺?瑜版挸澧?AI閿?{difficultyLabel} | Map ${mapLabel}`;
       }
     }
 
@@ -5517,28 +5260,31 @@
       return getEffectiveGameMode(state.activeGameMode || state.gameMode);
     }
 
-    function applyGameMode(modeId) {
+    function applyGameMode(modeId, options = {}) {
       const resolvedModeId = CONFIG.gameModes[modeId] ? modeId : 'duel';
       const mode = getEffectiveGameMode(resolvedModeId);
+      const mapDefinition = getActiveMapDefinition(options.mapId || resolveCurrentMapId());
+      const scale = mode.arenaScale ?? 1;
+
       state.activeGameMode = resolvedModeId;
       state.activeDifficulty = getDifficultyForMode(resolvedModeId);
+      state.activeMapId = mapDefinition.id || PVP_DEFAULT_MAP_ID;
       hud.dataset.gamemode = resolvedModeId;
       syncHudVisualState();
 
-      const scale = mode.arenaScale ?? 1;
-      CONFIG.arena.width = BASE_ARENA.width * scale;
-      CONFIG.arena.depth = BASE_ARENA.depth * scale;
+      CONFIG.arena.width = mapDefinition.arena.width * scale;
+      CONFIG.arena.depth = mapDefinition.arena.depth * scale;
       CONFIG.arena.bounds = {
-        minX: BASE_ARENA.bounds.minX * scale,
-        maxX: BASE_ARENA.bounds.maxX * scale,
-        minZ: BASE_ARENA.bounds.minZ * scale,
-        maxZ: BASE_ARENA.bounds.maxZ * scale
+        minX: mapDefinition.arena.bounds.minX * scale,
+        maxX: mapDefinition.arena.bounds.maxX * scale,
+        minZ: mapDefinition.arena.bounds.minZ * scale,
+        maxZ: mapDefinition.arena.bounds.maxZ * scale
       };
 
       clearArena();
       clearEntities();
       clearPickups();
-      buildArena();
+      buildArena(state.activeMapId);
       spawnEntities();
       setupHUD();
     }
@@ -5590,15 +5336,15 @@
       }
 
       replayControls.title.textContent = replayHudState.matchId
-        ? `${replayHudState.mode === 'deathmatch' ? '4浜轰贡鏂? : '1v1 瀵瑰喅'} 路 ${String(replayHudState.matchId).slice(0, 8)}`
-        : '鐩存挱寮忓洖鏀?;
+        ? `${replayHudState.mode === 'deathmatch' ? '4P Deathmatch' : '1v1 Duel'} | ${String(replayHudState.matchId).slice(0, 8)}`
+        : 'Replay Spectate';
       replayControls.status.textContent = replayHudState.loading
-        ? '杞藉叆涓?
-        : (replayHudState.finished ? '宸茬粨鏉? : (replayHudState.playing ? '鎾斁涓? : '宸叉殏鍋?));
+        ? 'Loading...'
+        : (replayHudState.finished ? 'Finished' : (replayHudState.playing ? 'Playing' : 'Paused'));
       replayControls.meta.textContent = replayHudState.loading
-        ? '姝ｅ湪杞藉叆鍥炴斁鍐呭骞跺垏鎹㈠埌鐩存挱寮忚鎴樸€?
-        : `瑙傚療 ${players.length || 0} 鍚嶇帺瀹?路 ${replayHudState.cameraMode === 'free' ? '鑷敱闀滃ご' : '璺熼殢闀滃ご'}`;
-      replayControls.play.textContent = replayHudState.finished ? '閲嶆挱' : (replayHudState.playing ? '鏆傚仠' : '鎾斁');
+        ? 'Loading replay data and switching to spectator mode...'
+        : `Players ${players.length || 0} | Camera ${replayHudState.cameraMode === 'free' ? 'Free' : 'Follow'}`;
+      replayControls.play.textContent = replayHudState.finished ? 'Restart' : (replayHudState.playing ? 'Pause' : 'Play');
       replayControls.slider.max = String(Math.max(0, Math.round((replayHudState.durationSeconds || 0) * 10)));
       replayControls.slider.value = String(Math.round((replayHudState.playheadSeconds || 0) * 10));
       replayControls.slider.disabled = replayHudState.loading;
@@ -5674,6 +5420,7 @@
       livePvp.active = false;
       livePvp.matchId = null;
       livePvp.mode = null;
+      livePvp.mapId = null;
       livePvp.role = 'player';
       livePvp.isSpectator = false;
       livePvp.isReplay = false;
@@ -5696,7 +5443,7 @@
     }
 
     function formatPvpPlaceholderMode(mode) {
-      return mode === 'deathmatch' ? '4浜轰贡鏂? : '1v1 瀵瑰喅';
+      return mode === 'deathmatch' ? '4P Deathmatch' : '1v1 Duel';
     }
 
     function buildPvpPlaceholderPlayerRow(player) {
@@ -5713,7 +5460,7 @@
       const tagWrap = document.createElement('div');
       const tag = document.createElement('span');
       tag.className = 'pvpPlaceholderTag';
-      tag.textContent = player?.isHost ? '鎴夸富' : '鎴愬憳';
+      tag.textContent = player?.isHost ? 'Host' : 'Member';
       tagWrap.appendChild(tag);
 
       item.append(identity, tagWrap);
@@ -5727,9 +5474,9 @@
 
       const placeholder = state.pvpPlaceholder;
       if (!placeholder) {
-        pvpPlaceholderTitleEl.textContent = 'PVP 鎴块棿宸茬粍濂?;
-        pvpPlaceholderMetaEl.textContent = '鎴块棿鍜岀帺瀹朵笂涓嬫枃宸蹭繚鐣欙紝鐪熸鍦ㄧ嚎鍚屾鎴樻枟浼氬湪涓嬩竴闃舵鎺ュ叆銆?;
-        pvpPlaceholderHintEl.textContent = '褰撳墠鏄崰浣嶅紑鎴樻祦绋嬶細涓嶄細杩涘叆鏈湴 PVE锛屼篃涓嶄細瑙﹀彂瀹㈡埛绔嚜鎶ュ紡缁撶畻銆?;
+        pvpPlaceholderTitleEl.textContent = 'PVP Placeholder Match';
+        pvpPlaceholderMetaEl.textContent = 'Room and player context are preserved here until live server-side combat is attached.';
+        pvpPlaceholderHintEl.textContent = 'This is only a placeholder launch flow. It will not enter local PVE or trigger any local-only rewards.';
         pvpPlaceholderRosterEl.replaceChildren();
         return;
       }
@@ -5737,13 +5484,13 @@
       const players = Array.isArray(placeholder.players) ? placeholder.players : [];
       const startedAtLabel = placeholder.startedAt
         ? new Date(placeholder.startedAt).toLocaleString()
-        : '鍒氬垰';
-      pvpPlaceholderTitleEl.textContent = `${formatPvpPlaceholderMode(placeholder.mode)} 宸茶繘鍏ュ崰浣嶅紑鎴榒;
+        : 'Unknown';
+      pvpPlaceholderTitleEl.textContent = `${formatPvpPlaceholderMode(placeholder.mode)} Placeholder Match`;
       pvpPlaceholderMetaEl.textContent =
         `鎴块棿鐮?${placeholder.roomCode || '-'} 路 鎴块棿 ID ${placeholder.roomId || '-'} 路 ` +
         `鐜╁鏁?${players.length} 路 寮€濮嬫椂闂?${startedAtLabel}`;
       pvpPlaceholderHintEl.textContent =
-        '褰撳墠闃舵鍙繚鐣欐埧闂淬€佹ā寮忓拰鐜╁涓婁笅鏂囷紝鍚庣画鎺ュ叆鏈嶅姟绔潈濞佸湪绾挎垬鏂楁椂浼氱洿鎺ュ鐢ㄨ繖閲岀殑鏁版嵁銆?;
+        'This room state only keeps room, mode, and player context for now. It will be reused once authoritative online combat is connected.';
       pvpPlaceholderRosterEl.replaceChildren(...players.map((player) => buildPvpPlaceholderPlayerRow(player)));
     }
 
@@ -5780,19 +5527,279 @@
       renderPvpPlaceholderOverlay();
 
       if (options.forceOpen || (isNewPlaceholder && !state.pvpPlaceholderDismissed)) {
-        showBanner('PVP 鎴块棿宸茬粍濂斤紝杩涘叆鍗犱綅寮€鎴樸€?, { skipFeedback: true });
+        showBanner('PVP placeholder room is ready. Opening the placeholder match view.', { skipFeedback: true });
         setMode('pvpPlaceholder');
       }
     }
 
-    function buildPvpArena() {
+    function buildArena(mapId = state.activeMapId || PVP_DEFAULT_MAP_ID) {
+      const manifest = assets.manifest.assets.toonshooter;
+      const mapDefinition = getActiveMapDefinition(mapId);
+      const localMap = mapDefinition.local || {};
+      const arenaDefinition = mapDefinition.arena || DEFAULT_MAP_DEFINITION.arena;
+      const coverLayout = Array.isArray(localMap.coverLayout) ? localMap.coverLayout : [];
+      const decorativePlacements = Array.isArray(localMap.decorativePlacements) ? localMap.decorativePlacements : [];
+      const fallbackSizes = localMap.fallbackSizes || {};
+      const fenceConfig = localMap.fence || { key: 'Fence_Long', offset: 0.4, scale: 1.1 };
+      const ground = new THREE.Mesh(
+        new THREE.PlaneGeometry(
+          arenaDefinition.ground.width * (CONFIG.arena.width / arenaDefinition.width),
+          arenaDefinition.ground.depth * (CONFIG.arena.depth / arenaDefinition.depth)
+        ),
+        new THREE.MeshStandardMaterial({ color: COLORS.dust, roughness: 0.9, metalness: 0.05 })
+      );
+      ground.rotation.x = -Math.PI / 2;
+      ground.receiveShadow = true;
+      world.scene.add(ground);
+      world.arenaObjects.push(ground);
+
+      const border = new THREE.LineSegments(
+        new THREE.EdgesGeometry(new THREE.PlaneGeometry(CONFIG.arena.width, CONFIG.arena.depth)),
+        new THREE.LineBasicMaterial({ color: COLORS.dustDark })
+      );
+      border.rotation.x = -Math.PI / 2;
+      border.position.y = 0.02;
+      world.scene.add(border);
+      world.arenaObjects.push(border);
+      world.arenaDecor = [];
+
+      coverLayout.forEach((item) => {
+        const path = manifest.environment[item.key];
+        const clone = path ? cloneAsset(path) : null;
+        const isFallback = !clone;
+        const activeVisual = isFallback ? 'placeholder' : 'gltf';
+        const visuals = { gltf: null, placeholder: null };
+        const fallbackSize = fallbackSizes[item.key] || [
+          Math.max(0.9, Number(item.sizeX) || 1.2),
+          item.key === 'Pallet' ? 0.2 : item.key.includes('Boxes') ? 0.8 : 1.2,
+          Math.max(0.9, Number(item.sizeZ) || 1.2)
+        ];
+        const root = isFallback
+          ? new THREE.Mesh(
+              new THREE.BoxGeometry(...fallbackSize),
+              new THREE.MeshStandardMaterial({ color: COLORS.steel, roughness: 0.7, metalness: 0.1 })
+            )
+          : normalizeToHeight(clone.root, null);
+        if (isFallback) root.position.y = fallbackSize[1] / 2;
+        visuals[activeVisual] = isFallback ? markPlaceholder(root) : root;
+        root.position.set(Number(item.x) || 0, root.position.y, Number(item.z) || 0);
+        root.rotation.y = Number(item.rot) || 0;
+        root.traverse?.((child) => {
+          if (child.isMesh) {
+            child.castShadow = true;
+            child.receiveShadow = true;
+          }
+        });
+        world.scene.add(root);
+        world.arenaObjects.push(root);
+
+        const box = computeMeshBounds(root);
+        const inset = 0.08;
+        const typeCfg = CONFIG.cover.types[item.key] || null;
+        const cover = {
+          key: item.key,
+          assetPath: path,
+          mesh: root,
+          visuals,
+          activeVisual,
+          spawnPos: root.position.clone(),
+          spawnRotY: root.rotation.y,
+          minX: box.min.x + inset,
+          maxX: box.max.x - inset,
+          minZ: box.min.z + inset,
+          maxZ: box.max.z - inset,
+          minY: box.min.y,
+          maxY: box.max.y,
+          blocksLoS: true,
+          active: true,
+          destructible: Boolean(typeCfg),
+          hp: typeCfg ? typeCfg.hp : null,
+          maxHp: typeCfg ? typeCfg.hp : null,
+          kickable: Boolean(typeCfg),
+          flashTimer: 0,
+          originalMaterials: null,
+          colliderOffsets: null,
+          kickState: null
+        };
+        cacheCoverColliderOffsets(cover);
+        world.cover.push(cover);
+      });
+
+      decorativePlacements.forEach((item) => {
+        const path = manifest.environment[item.key];
+        if (!path) return;
+        const clone = cloneAsset(path);
+        const activeVisual = clone ? 'gltf' : 'placeholder';
+        const visuals = { gltf: null, placeholder: null };
+        const root = clone
+          ? normalizeToHeight(clone.root, null)
+          : markPlaceholder(
+              new THREE.Mesh(
+                new THREE.BoxGeometry(0.9, 0.6, 0.9),
+                new THREE.MeshStandardMaterial({ color: COLORS.dustDark, roughness: 0.85, metalness: 0.05 })
+              )
+            );
+        visuals[activeVisual] = root;
+        root.position.set(Number(item.pos?.[0]) || 0, root.position.y, Number(item.pos?.[2]) || 0);
+        root.rotation.y = Number(item.rot) || 0;
+        root.traverse?.((child) => {
+          if (child.isMesh) {
+            child.castShadow = true;
+            child.receiveShadow = true;
+          }
+        });
+        world.scene.add(root);
+        world.arenaObjects.push(root);
+        world.arenaDecor.push({ kind: 'prop', key: item.key, assetPath: path, mesh: root, visuals, activeVisual });
+      });
+
+      const fencePath = manifest.environment[fenceConfig.key || 'Fence_Long'];
+      const fenceClone = fencePath ? cloneAsset(fencePath) : null;
+      const fenceOffset = Number(fenceConfig.offset) || 0.4;
+      const fenceSegments = [
+        { pos: [0, 0, CONFIG.arena.bounds.minZ - fenceOffset], rot: 0, len: CONFIG.arena.width + fenceOffset * 2 },
+        { pos: [0, 0, CONFIG.arena.bounds.maxZ + fenceOffset], rot: Math.PI, len: CONFIG.arena.width + fenceOffset * 2 },
+        { pos: [CONFIG.arena.bounds.minX - fenceOffset, 0, 0], rot: Math.PI / 2, len: CONFIG.arena.depth + fenceOffset * 2 },
+        { pos: [CONFIG.arena.bounds.maxX + fenceOffset, 0, 0], rot: -Math.PI / 2, len: CONFIG.arena.depth + fenceOffset * 2 }
+      ];
+      const fenceModel = fenceClone ? normalizeToHeight(fenceClone.root, null) : null;
+      fenceSegments.forEach((segment) => {
+        const fence = fenceModel
+          ? fenceModel.clone(true)
+          : markPlaceholder(
+              new THREE.Mesh(
+                new THREE.BoxGeometry(segment.len, 1.1, 0.18),
+                new THREE.MeshStandardMaterial({ color: COLORS.steel, roughness: 0.8, metalness: 0.05 })
+              )
+            );
+        const activeVisual = fenceModel ? 'gltf' : 'placeholder';
+        const visuals = { gltf: null, placeholder: null };
+        visuals[activeVisual] = fence;
+        if (fenceModel) {
+          fence.position.set(segment.pos[0], 0, segment.pos[2]);
+        } else {
+          fence.position.set(segment.pos[0], 0.55, segment.pos[2]);
+        }
+        fence.rotation.y = segment.rot;
+        fence.scale.setScalar(Number(fenceConfig.scale) || 1.1);
+        world.scene.add(fence);
+        world.arenaObjects.push(fence);
+        world.arenaDecor.push({
+          kind: 'fence',
+          key: fenceConfig.key || 'Fence_Long',
+          assetPath: fencePath,
+          mesh: fence,
+          visuals,
+          activeVisual,
+          placeholderLength: segment.len
+        });
+      });
+
+      world.arenaLayout = {
+        mapId: mapDefinition.id,
+        decorativePlacements,
+        fallbackSizes,
+        fenceSegments
+      };
+
+      spawnBarrels(mapDefinition.id);
+      buildCoverNodes(mapDefinition.id);
+    }
+
+    function spawnBarrels(mapId = state.activeMapId || PVP_DEFAULT_MAP_ID) {
+      const manifest = assets.manifest.assets.toonshooter;
+      const barrelPath = manifest.environment.ExplodingBarrel;
+      const barrelClone = barrelPath ? cloneAsset(barrelPath) : null;
+      const barrelPositions = getActiveMapDefinition(mapId).local?.barrelPositions || [];
+
+      barrelPositions.forEach((position) => {
+        const spawnPosition = new THREE.Vector3(
+          Number(position?.x) || 0,
+          Number(position?.y) || 0,
+          Number(position?.z) || 0
+        );
+        const barrelRoot = barrelClone ? normalizeToHeight(barrelClone.root.clone(true), null) : null;
+        const fallback = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.45, 0.45, 1.2, 12),
+          new THREE.MeshStandardMaterial({ color: COLORS.warning, roughness: 0.4, metalness: 0.2 })
+        );
+        const mesh = barrelRoot || fallback;
+        const activeVisual = barrelRoot ? 'gltf' : 'placeholder';
+        const visuals = { gltf: null, placeholder: null };
+        mesh.position.copy(spawnPosition);
+        if (!barrelRoot) mesh.position.y = 0.6;
+        if (!barrelRoot) markPlaceholder(mesh);
+        visuals[activeVisual] = mesh;
+        mesh.castShadow = true;
+        mesh.receiveShadow = true;
+        world.scene.add(mesh);
+        world.barrels.push({
+          assetPath: barrelPath,
+          mesh,
+          position: mesh.position,
+          visuals,
+          activeVisual,
+          spawnPos: spawnPosition.clone(),
+          velocity: new THREE.Vector3(),
+          hp: CONFIG.barrel.hp,
+          alive: true,
+          radius: CONFIG.barrel.radius,
+          isRolling: false,
+          rollTimer: 0
+        });
+      });
+    }
+
+    function buildCoverNodes(mapId = state.activeMapId || PVP_DEFAULT_MAP_ID) {
+      world.nodes = [];
+      const offset = 1.1;
+      world.cover.forEach((box) => {
+        if (box.active === false) return;
+        const cx = (box.minX + box.maxX) / 2;
+        const cz = (box.minZ + box.maxZ) / 2;
+        const hx = (box.maxX - box.minX) / 2 + offset;
+        const hz = (box.maxZ - box.minZ) / 2 + offset;
+        addNode(cx + hx, cz);
+        addNode(cx - hx, cz);
+        addNode(cx, cz + hz);
+        addNode(cx, cz - hz);
+      });
+
+      const navSeedPoints = getActiveMapDefinition(mapId).local?.navSeedPoints || [];
+      navSeedPoints.forEach((point) => {
+        addNode(Number(point?.x) || 0, Number(point?.z) || 0);
+      });
+
+      function addNode(x, z) {
+        if (x < CONFIG.arena.bounds.minX + 1 || x > CONFIG.arena.bounds.maxX - 1) return;
+        if (z < CONFIG.arena.bounds.minZ + 1 || z > CONFIG.arena.bounds.maxZ - 1) return;
+        world.nodes.push(new THREE.Vector3(x, 0, z));
+      }
+    }
+
+    function getSpawnPoints(count, mapId = state.activeMapId || PVP_DEFAULT_MAP_ID) {
+      const spawnPoints = getActiveMapDefinition(mapId).local?.spawnPoints || [];
+      return spawnPoints
+        .slice(0, count)
+        .map((point) => new THREE.Vector3(Number(point?.x) || 0, Number(point?.y) || 0, Number(point?.z) || 0));
+    }
+
+    function buildPvpArena(mapId = livePvp.mapId || state.activeMapId || PVP_DEFAULT_MAP_ID) {
       const manifest = assets.manifest?.assets?.toonshooter;
-      CONFIG.arena.width = PVP_COMBAT_ARENA.width;
-      CONFIG.arena.depth = PVP_COMBAT_ARENA.depth;
-      CONFIG.arena.bounds = { ...PVP_COMBAT_ARENA.bounds };
+      const mapDefinition = getActiveMapDefinition(mapId);
+      const combatMap = mapDefinition.combat || {};
+      const arenaDefinition = combatMap.arena || mapDefinition.arena;
+      const groundDefinition = mapDefinition.arena?.ground || DEFAULT_MAP_DEFINITION.arena.ground;
+      const coverLayout = Array.isArray(combatMap.coverLayout) ? combatMap.coverLayout : [];
+      const fallbackSizes = combatMap.fallbackSizes || {};
+      const fenceConfig = mapDefinition.local?.fence || { key: 'Fence_Long', offset: 0.4, scale: 1.1 };
+
+      CONFIG.arena.width = arenaDefinition.width;
+      CONFIG.arena.depth = arenaDefinition.depth;
+      CONFIG.arena.bounds = { ...arenaDefinition.bounds };
 
       const ground = new THREE.Mesh(
-        new THREE.PlaneGeometry(BASE_ARENA.ground.width, BASE_ARENA.ground.depth),
+        new THREE.PlaneGeometry(groundDefinition.width, groundDefinition.depth),
         new THREE.MeshStandardMaterial({ color: COLORS.dust, roughness: 0.9, metalness: 0.05 })
       );
       ground.rotation.x = -Math.PI / 2;
@@ -5814,12 +5821,12 @@
       world.nodes = [];
       world.arenaDecor = [];
 
-      PVP_COMBAT_COVER_LAYOUT.forEach((item) => {
+      coverLayout.forEach((item) => {
         const path = manifest?.environment?.[item.key];
         const clone = path ? cloneAsset(path) : null;
         const activeVisual = clone ? 'gltf' : 'placeholder';
         const visuals = { gltf: null, placeholder: null };
-        const fallbackSize = LIVE_PVP_ARENA_FALLBACK_SIZES[item.key] || [
+        const fallbackSize = fallbackSizes[item.key] || [
           Math.max(0.9, Number(item.sizeX) || 1.2),
           item.key === 'Pallet' ? 0.2 : item.key.includes('Boxes') ? 0.8 : 1.2,
           Math.max(0.9, Number(item.sizeZ) || 1.2)
@@ -5836,8 +5843,8 @@
         if (!clone) {
           root.position.y = fallbackSize[1] / 2;
         }
-        root.position.set(item.x, root.position.y, item.z);
-        root.rotation.y = item.rot;
+        root.position.set(Number(item.x) || 0, root.position.y, Number(item.z) || 0);
+        root.rotation.y = Number(item.rot) || 0;
         root.traverse?.((child) => {
           if (child.isMesh) {
             child.castShadow = true;
@@ -5878,13 +5885,14 @@
         world.cover.push(cover);
       });
 
-      const fencePath = manifest?.environment?.Fence_Long;
+      const fencePath = manifest?.environment?.[fenceConfig.key || 'Fence_Long'];
       const fenceClone = fencePath ? cloneAsset(fencePath) : null;
+      const fenceOffset = Number(fenceConfig.offset) || 0.4;
       const fenceSegments = [
-        { pos: [0, 0, CONFIG.arena.bounds.minZ - 0.4], rot: 0, len: CONFIG.arena.width + 0.8 },
-        { pos: [0, 0, CONFIG.arena.bounds.maxZ + 0.4], rot: Math.PI, len: CONFIG.arena.width + 0.8 },
-        { pos: [CONFIG.arena.bounds.minX - 0.4, 0, 0], rot: Math.PI / 2, len: CONFIG.arena.depth + 0.8 },
-        { pos: [CONFIG.arena.bounds.maxX + 0.4, 0, 0], rot: -Math.PI / 2, len: CONFIG.arena.depth + 0.8 }
+        { pos: [0, 0, CONFIG.arena.bounds.minZ - fenceOffset], rot: 0, len: CONFIG.arena.width + fenceOffset * 2 },
+        { pos: [0, 0, CONFIG.arena.bounds.maxZ + fenceOffset], rot: Math.PI, len: CONFIG.arena.width + fenceOffset * 2 },
+        { pos: [CONFIG.arena.bounds.minX - fenceOffset, 0, 0], rot: Math.PI / 2, len: CONFIG.arena.depth + fenceOffset * 2 },
+        { pos: [CONFIG.arena.bounds.maxX + fenceOffset, 0, 0], rot: -Math.PI / 2, len: CONFIG.arena.depth + fenceOffset * 2 }
       ];
       const fenceModel = fenceClone ? normalizeToHeight(fenceClone.root, null) : null;
       fenceSegments.forEach((segment) => {
@@ -5905,12 +5913,12 @@
           fence.position.set(segment.pos[0], 0.55, segment.pos[2]);
         }
         fence.rotation.y = segment.rot;
-        fence.scale.setScalar(1.1);
+        fence.scale.setScalar(Number(fenceConfig.scale) || 1.1);
         world.scene.add(fence);
         world.arenaObjects.push(fence);
         world.arenaDecor.push({
           kind: 'fence',
-          key: 'Fence_Long',
+          key: fenceConfig.key || 'Fence_Long',
           assetPath: fencePath,
           mesh: fence,
           visuals,
@@ -5921,6 +5929,8 @@
 
       world.arenaLayout = {
         livePvp: true,
+        mapId: mapDefinition.id,
+        fallbackSizes,
         fenceSegments
       };
     }
@@ -6021,7 +6031,12 @@
         if (entity.isPlayer && !livePvp.isSpectator) {
           const inputState = buildLivePvpInputState(entity);
           const predicted = currentPlayer.alive && !currentPlayer.eliminated
-            ? predictLocalPlayerState(currentPlayer, inputState, localPredictionSeconds)
+            ? predictLocalPlayerState(
+                currentPlayer,
+                inputState,
+                localPredictionSeconds,
+                livePvp.mapId || livePvp.snapshot?.mapId || PVP_DEFAULT_MAP_ID
+              )
             : null;
           configureEntityFromLiveSnapshot(entity, currentPlayer, predicted);
           return;
@@ -6045,16 +6060,18 @@
     function startLivePvpMatch(payload) {
       if (!payload?.snapshot) return;
       const replayInfo = payload.replay && typeof payload.replay === 'object' ? payload.replay : null;
+      const mapDefinition = getActiveMapDefinition(payload.mapId || payload.snapshot?.mapId || PVP_DEFAULT_MAP_ID);
 
       state.gameMode = payload.mode || 'duel';
       state.activeGameMode = state.gameMode;
       state.activeDifficulty = null;
+      state.activeMapId = mapDefinition.id;
       hud.dataset.gamemode = state.gameMode;
 
       clearArena();
       clearEntities();
       clearPickups();
-      buildPvpArena();
+      buildPvpArena(mapDefinition.id);
 
       const players = payload.snapshot.players || [];
       const liveRole = payload.role || livePvp.role || 'player';
@@ -6076,6 +6093,7 @@
       livePvp.active = true;
       livePvp.matchId = payload.matchId || payload.snapshot.matchId || null;
       livePvp.mode = payload.mode || payload.snapshot.mode || 'duel';
+      livePvp.mapId = mapDefinition.id;
       livePvp.role = liveRole;
       livePvp.isSpectator = liveRole === 'spectator';
       livePvp.isReplay = Boolean(replayInfo?.active);
@@ -6109,6 +6127,14 @@
       if (!livePvp.active || livePvp.matchId !== payload.matchId) {
         startLivePvpMatch(payload);
         return;
+      }
+
+      const nextMapDefinition = getActiveMapDefinition(payload.mapId || payload.snapshot?.mapId || livePvp.mapId || PVP_DEFAULT_MAP_ID);
+      if (nextMapDefinition.id !== livePvp.mapId) {
+        livePvp.mapId = nextMapDefinition.id;
+        state.activeMapId = nextMapDefinition.id;
+        clearArena();
+        buildPvpArena(nextMapDefinition.id);
       }
 
       livePvp.previousSnapshot = livePvp.snapshot || payload;
@@ -6228,19 +6254,19 @@
       }
 
       if (event.type === 'round_start') {
-        showBanner(`绗?${event.round || state.round} 鍥炲悎寮€濮媊, { skipFeedback: true });
+        showBanner(`Round ${event.round || state.round} started`, { skipFeedback: true });
         return;
       }
 
       if (event.type === 'round_end') {
         state.roundResults.push(event.winnerTeam);
         updateRoundPips();
-        showBanner(`鏈洖鍚?${event.winnerTeam || '-'} 鑾疯儨`, { skipFeedback: true });
+        showBanner(`Round winner ${event.winnerTeam || '-'}`, { skipFeedback: true });
         return;
       }
 
       if (event.type === 'respawn') {
-        showBanner('鏈変汉宸查噸鐢?, { skipFeedback: true });
+        showBanner('Player respawned.', { skipFeedback: true });
         return;
       }
 
@@ -6277,35 +6303,35 @@
         const winner = result?.stats?.find((entry) => entry.won) || null;
         const winnerName = winner?.displayName || winner?.username || result?.winnerTeam || '鏈煡鐜╁';
         const mvp = result?.stats?.find((entry) => String(entry.userId) === String(result?.mvpUserId)) || null;
-        matchTitle.textContent = aborted ? '鍥炴斁宸查€€鍑? : '鍥炴斁缁撴潫';
+        matchTitle.textContent = aborted ? 'Replay Exited' : 'Replay Finished';
         matchStats.textContent = aborted
-          ? '宸查€€鍑虹洿鎾紡鍥炴斁銆?
-          : `鑳滆€?${winnerName} 路 MVP: ${mvp?.displayName || mvp?.username || '鏃?}`;
+          ? 'Exited live-style replay.'
+          : `Winner ${winnerName} | MVP: ${mvp?.displayName || mvp?.username || 'N/A'}`;
         if (touchRestartBtn) {
           touchRestartBtn.textContent = '閲嶆柊鎾斁';
         }
-        bestTimeEnd.textContent = '杩欐槸鍥炴斁锛屼笉瑙﹀彂浠讳綍濂栧姳銆?;
+        bestTimeEnd.textContent = 'Replay mode does not grant rewards.';
         setMode('matchOver');
         return;
       }
 
       if (aborted) {
-        matchTitle.textContent = wasSpectating ? '瑙傝禌宸蹭腑鏂? : '鍦ㄧ嚎 PVP 瀵瑰眬宸蹭腑鏂?;
+        matchTitle.textContent = wasSpectating ? 'Spectate Ended' : 'Live PVP Interrupted';
         matchStats.textContent = wasSpectating
-          ? '鏈嶅姟鍣ㄤ腑鏂垨鎴块棿寮傚父鍏抽棴锛岃繖鍦鸿璧涘凡缁撴潫銆?
-          : '鏈嶅姟鍣ㄤ腑鏂垨鎴块棿寮傚父鍏抽棴锛屾湰灞€涓嶄細鑷姩鍙戠爜銆?;
+          ? 'The room closed or the server disconnected. Spectate has ended.'
+          : 'The room closed or the server disconnected. This match will not grant anything automatically.';
       } else {
         const winner = result?.stats?.find((entry) => entry.won) || null;
         const winnerName = winner?.displayName || winner?.username || result?.winnerTeam || '鏈煡鐜╁';
         const mvp = result?.stats?.find((entry) => String(entry.userId) === String(result?.mvpUserId)) || null;
-        matchTitle.textContent = wasSpectating ? '瑙傝禌缁撴潫' : `${winnerName} 鑾疯儨`;
+        matchTitle.textContent = wasSpectating ? 'Spectate Finished' : `${winnerName} Wins`;
         matchStats.textContent = wasSpectating
-          ? `鏈満鑳滆€? ${winnerName} 路 MVP: ${mvp?.displayName || mvp?.username || '鏃?}`
-          : `鍦ㄧ嚎 PVP 宸茬粨鏉?路 MVP: ${mvp?.displayName || mvp?.username || '鏃?} 路 涓嶈Е鍙戣嚜鍔ㄥ彂鐮乣;
+          ? `Winner ${winnerName} | MVP: ${mvp?.displayName || mvp?.username || 'N/A'}`
+          : `Online PVP finished | MVP: ${mvp?.displayName || mvp?.username || 'N/A'} | rewards disabled`;
       }
       bestTimeEnd.textContent = wasSpectating
-        ? '褰撳墠鍙槸瑙傝禌锛屼笉瑙﹀彂浠讳綍濂栧姳銆?
-        : '鍦ㄧ嚎 PVP 濂栧姳浠嶄繚鎸佸叧闂紝鍙褰曟潈濞佸灞€鍘嗗彶銆?;
+        ? 'This was spectator mode, so no rewards are granted.'
+        : 'Online PVP rewards are still disabled. Only authoritative match history is recorded.';
       setMode('matchOver');
     }
 
@@ -6876,8 +6902,8 @@
       fx.combatFeedKind = 'idle';
       fx.combatFeedSeverity = 'calm';
       fx.combatFeedEmphasis = 'standard';
-      fx.combatFeedLabel = '鎴樺満绋冲畾';
-      fx.combatFeedMeta = '鍏堣瀵燂紝鍐嶅帇鏋€?;
+      fx.combatFeedLabel = 'Combat Ready';
+      fx.combatFeedMeta = 'Observe first, then fire.';
       fx.combatFeedTimer = 0;
       fx.combatFeedMaxTimer = 0;
       fx.combatFeedLift = 8;
@@ -7763,7 +7789,7 @@
           // 鐖嗗ご寮瑰嚭鎻愮ず
           const popupPos = target.position.clone();
           popupPos.y = 2.5;
-          spawnPopup('鐖嗗ご锛?, popupPos, 'close', 1.0);
+          spawnPopup('Headshot', popupPos, 'close', 1.0);
         }
         if (didKill) shotResult.didKill = true;
         if (!knockState.applied) {
@@ -8143,8 +8169,8 @@
             suddenDeathEl.classList.add('show');
             presentCombatFeedback({
               type: 'round_transition',
-              label: '娈婃涓€鎼?,
-              meta: '澶氫汉骞跺垪锛岃繘鍏ョ獊鐒舵浜?,
+              label: 'Sudden Death',
+              meta: 'Multiple survivors remain. The next decisive takedown wins.',
               duration: 1.0
             });
           }
@@ -8156,8 +8182,8 @@
             suddenDeathEl.classList.add('show');
             presentCombatFeedback({
               type: 'round_transition',
-              label: '娈婃涓€鎼?,
-              meta: '琛€閲忔寔骞筹紝涓嬩竴鍑诲喅鑳?,
+              label: 'Sudden Death',
+              meta: 'HP is tied as well. The next decisive hit wins.',
               duration: 1.0
             });
           } else if (player && enemy) {
@@ -8823,7 +8849,7 @@
 
       if (target.lives <= 0) {
         target.eliminated = true;
-        spawnPopup('宸叉窐姹?, popupPos, 'close', 0.9);
+        spawnPopup('Eliminated', popupPos, 'close', 0.9);
       } else {
         target.respawnTimer = 1.2;
         spawnPopup(`鍓╀綑澶嶆椿娆℃暟: ${target.lives}`, popupPos, 'close', 0.7);
@@ -9483,7 +9509,7 @@
 
         const popupPos = target.position.clone();
         popupPos.y = 1.9;
-        spawnPopup('鎿﹀脊韬查棯锛?, popupPos, 'close', 0.6);
+        spawnPopup('Near Miss', popupPos, 'close', 0.6);
       }
     }
 
@@ -9506,7 +9532,7 @@
       }
 
       setTimeScale(0.8, 0.35);
-      showBanner(winner === 'p1' ? '鐜╁ 1 璧㈠緱鏈洖鍚? : '鐜╁ 2 璧㈠緱鏈洖鍚?);
+      showBanner(winner === 'p1' ? 'Player 1 wins the round' : 'Player 2 wins the round');
 
       setTimeout(() => {
         state.roundEnding = false;
@@ -9728,9 +9754,9 @@
       } else {
         const winnerEntity = getEntityByTeam(winner);
         const winnerLabel = winnerEntity?.displayName || (winner === 'p1' ? 'Player 1' : winner === 'p2' ? 'Player 2' : 'Player');
-        matchTitle.textContent = `${winnerLabel.toUpperCase()} 鑾疯儨锛乣;
+        matchTitle.textContent = `${winnerLabel.toUpperCase()} WINS`;
       }
-      matchStats.textContent = `姣旇禌鐢ㄦ椂: ${formatTime(elapsed)} 路 鏈眬MVP: ${matchSummary.mvpName || '鏃?}`;
+      matchStats.textContent = `Match Time: ${formatTime(elapsed)} | MVP: ${matchSummary.mvpName || 'N/A'}`;
 
       if (state.gameMode === 'duel' && winner === 'p1') {
         if (state.bestWinTime === null || elapsed < state.bestWinTime) {
@@ -9756,7 +9782,7 @@
       if (state.mode !== 'playing' && state.mode !== 'paused') return;
       if (state.mode === 'playing') {
         setMode('paused');
-        bannerEl.textContent = '宸叉殏鍋?;
+        bannerEl.textContent = 'Paused';
         bannerEl.classList.add('show');
       } else if (state.mode === 'paused') {
         bannerEl.classList.remove('show');
@@ -9835,11 +9861,11 @@
       }
 
       if (mobileModeChipEl) {
-        mobileModeChipEl.textContent = modeBadgeEl?.textContent || (state.gameMode === 'deathmatch' ? '4浜轰贡鏂? : '1v1 瀵瑰喅');
+        mobileModeChipEl.textContent = modeBadgeEl?.textContent || (state.gameMode === 'deathmatch' ? '4P Deathmatch' : '1v1 Duel');
       }
 
       if (mobileDangerChipEl) {
-        mobileDangerChipEl.textContent = dangerBadgeEl?.textContent || '鎴樺満绋冲畾';
+        mobileDangerChipEl.textContent = dangerBadgeEl?.textContent || 'Combat Ready';
         mobileDangerChipEl.dataset.severity = dangerSeverity;
       }
 
@@ -9847,9 +9873,9 @@
         if (!player) {
           mobileWeaponNameEl.textContent = '绛夊緟瑙掕壊';
         } else if (isSwitching) {
-          mobileWeaponNameEl.textContent = '鍒囨灙涓?;
+          mobileWeaponNameEl.textContent = 'Switching...';
         } else {
-          mobileWeaponNameEl.textContent = weaponNameMap[activeWeaponId] || activeWeaponConfig?.name || '姝﹀櫒';
+          mobileWeaponNameEl.textContent = weaponNameMap[activeWeaponId] || activeWeaponConfig?.name || 'Weapon';
         }
       }
 
@@ -9858,21 +9884,21 @@
         if (!player || !weaponState || !activeWeaponConfig) {
           mobileWeaponAmmoEl.textContent = hpText;
         } else if (isSwitching) {
-          mobileWeaponAmmoEl.textContent = `${hpText} 路 鍑嗗涓璥;
+          mobileWeaponAmmoEl.textContent = `${hpText} | switching`;
         } else if (weaponState.reloadTimer > 0) {
-          mobileWeaponAmmoEl.textContent = `${hpText} 路 鎹㈠脊涓璥;
+          mobileWeaponAmmoEl.textContent = `${hpText} | reloading`;
         } else {
           mobileWeaponAmmoEl.textContent = `${hpText} 路 ${weaponState.ammo}/${activeWeaponConfig.magSize} [${weaponState.reserve}]`;
         }
       }
 
       if (mobilePauseBtn) {
-        mobilePauseBtn.textContent = state.mode === 'paused' ? '缁х画' : '鏆傚仠';
+        mobilePauseBtn.textContent = state.mode === 'paused' ? 'Resume' : 'Pause';
       }
 
       if (mobileTacticalBtn) {
         mobileTacticalBtn.disabled = !isPlaying || mobileState.orientationBlocked;
-        mobileTacticalBtn.textContent = mobileState.panelExpanded ? '鏀惰捣' : '鎴樻湳';
+        mobileTacticalBtn.textContent = mobileState.panelExpanded ? 'Hide Panel' : 'Tactics';
       }
 
       if (mobileFireBtn) {
@@ -9893,17 +9919,17 @@
 
       if (mobileDashBtn) {
         mobileDashBtn.disabled = !isPlaying || !player || dashCooldown > 0;
-        mobileDashBtn.textContent = dashCooldown > 0.05 ? `闂伩 ${dashCooldown.toFixed(1)}s` : '闂伩';
+        mobileDashBtn.textContent = dashCooldown > 0.05 ? `Dash ${dashCooldown.toFixed(1)}s` : 'Dash';
       }
 
       if (mobileWeaponBtn) {
         mobileWeaponBtn.disabled = !isPlaying || !player || player.weapon?.switchTimer > 0;
         if (!player) {
-          mobileWeaponBtn.textContent = '鍒囨灙';
+          mobileWeaponBtn.textContent = 'Switch Weapon';
         } else if (isSwitching) {
-          mobileWeaponBtn.textContent = '鍒囨灙涓?;
+          mobileWeaponBtn.textContent = 'Switching...';
         } else {
-          mobileWeaponBtn.textContent = `鍒囨灙 ${weaponNameMap[activeWeaponId] || ''}`.trim();
+          mobileWeaponBtn.textContent = `Switch ${weaponNameMap[activeWeaponId] || ''}`.trim();
         }
       }
 
@@ -9971,7 +9997,7 @@
       panel.weaponIcon.textContent = weapon.name[0];
       panel.weaponName.textContent = weapon.name;
       if (isSwitching) {
-        panel.weaponAmmo.textContent = '鍒囨崲涓?;
+        panel.weaponAmmo.textContent = 'Switching...';
         panel.weaponReserve.textContent = '';
       } else {
         panel.weaponAmmo.textContent = `${state.ammo}/${weapon.magSize}`;
@@ -11198,7 +11224,7 @@
             targetTeam: team
           });
         },
-        triggerRoundTransition(label = '鍥炲悎鑺傚鍒囨崲', meta = '閲嶇疆绔欎綅锛屼簤澶轰腑绾?) {
+        triggerRoundTransition(label = 'Round Transition', meta = 'Resetting positions and contesting center.') {
           presentCombatFeedback({
             type: 'round_transition',
             label,
@@ -11298,6 +11324,8 @@
       const payload = {
         mode: state.mode,
         gameMode: state.gameMode,
+        mapSelection: getSelectedMapSelection(),
+        mapId: state.activeMapId || PVP_DEFAULT_MAP_ID,
         viewMode: state.viewMode,
         difficulty: getDifficultyForMode(state.gameMode),
         visualState: visualState,

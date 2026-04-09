@@ -1,3 +1,5 @@
+import { getPvpMapDefinition, getPvpMapLabel, normalizePvpMapId } from './pvp-map-catalog.mjs';
+
 export function createPvpReplayViewer({ apiRequest, formatDateTime }) {
   const state = {
     matchId: '',
@@ -50,6 +52,18 @@ export function createPvpReplayViewer({ apiRequest, formatDateTime }) {
     return player?.displayName || player?.username || String(userId || '-');
   }
 
+  function getReplayMapId() {
+    return normalizePvpMapId(
+      state.content?.mapId ||
+        state.content?.summary?.mapId ||
+        state.detail?.map?.mapId ||
+        state.detail?.match?.mapId ||
+        state.content?.result?.mapId ||
+        null,
+      null
+    );
+  }
+
   function getStatusText(replay) {
     if (!replay) return '无回放';
     if (replay.status === 'pruned') return '回放已清理';
@@ -68,6 +82,10 @@ export function createPvpReplayViewer({ apiRequest, formatDateTime }) {
   }
 
   function calculateBounds() {
+    const mapId = getReplayMapId();
+    if (mapId) {
+      return { ...getPvpMapDefinition(mapId).arena.bounds };
+    }
     const snapshots = getSnapshots();
     let minX = Infinity;
     let maxX = -Infinity;
@@ -311,7 +329,14 @@ export function createPvpReplayViewer({ apiRequest, formatDateTime }) {
     const eventPanel = state.detail?.eventPanel || null;
 
     state.ui.title.textContent = `回放 ${state.matchId.slice(0, 8)}`;
-    state.ui.subtitle.textContent = [state.detail?.match?.mode || replay?.mode || '-', getStatusText(replay)].join(' | ');
+    const replayMapId = getReplayMapId();
+    state.ui.subtitle.textContent = [
+      state.detail?.match?.mode || replay?.mode || '-',
+      replayMapId ? getPvpMapLabel(replayMapId) : null,
+      getStatusText(replay)
+    ]
+      .filter(Boolean)
+      .join(' | ');
     state.ui.slider.max = String(Math.max(0, Math.round(state.durationSeconds * 10)));
     state.ui.slider.value = String(Math.round(state.playheadSeconds * 10));
     state.ui.slider.disabled = !state.content;
