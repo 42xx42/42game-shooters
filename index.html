@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="shooters-asset-version" content="20260427-backalley-map-1" />
+  <meta name="shooters-asset-version" content="20260615-merge-backalley-reward-1" />
   <title>卡通大乱斗</title>
   <link rel="icon" type="image/x-icon" href="favicon.ico" />
   <style>
@@ -1894,6 +1894,79 @@
       font-weight: 700;
     }
 
+    .accountHistoryCard {
+      margin-top: 14px;
+      padding: 12px 14px;
+      border-radius: 14px;
+      background: rgba(1, 6, 11, 0.52);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .accountHistoryHead {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .accountHistoryHint {
+      color: rgba(255, 255, 255, 0.48);
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .accountHistoryList {
+      list-style: none;
+      margin: 10px 0 0;
+      padding: 0;
+      display: grid;
+      gap: 8px;
+    }
+
+    .accountHistoryItem {
+      display: grid;
+      gap: 4px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      background: rgba(126, 220, 255, 0.06);
+      border: 1px solid rgba(126, 220, 255, 0.08);
+    }
+
+    .accountHistoryTop {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .accountHistoryValue {
+      color: #f6fbff;
+      font-size: 13px;
+      font-weight: 800;
+      word-break: break-word;
+    }
+
+    .accountHistoryBadge {
+      display: inline-flex;
+      align-items: center;
+      border-radius: 999px;
+      padding: 3px 8px;
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      background: rgba(126, 220, 255, 0.16);
+      color: #bdefff;
+    }
+
+    .accountHistoryMeta {
+      color: rgba(255, 255, 255, 0.68);
+      font-size: 12px;
+      line-height: 1.5;
+      word-break: break-word;
+    }
+
     #accountFeedback {
       min-height: 20px;
       margin-top: 12px;
@@ -2541,6 +2614,13 @@
                   <span class="accountCodeLabel" id="accountCodeLabel">最近领取的 CDK</span>
                   <code id="accountCodeValue">-</code>
                   <button class="accountBtn secondary small" id="accountCopyBtn" type="button" hidden>复制</button>
+                </div>
+                <div class="accountHistoryCard" id="accountRewardHistory" hidden>
+                  <div class="accountHistoryHead">
+                    <span class="accountCodeLabel">Recent Rewards</span>
+                    <span class="accountHistoryHint">42 API / CDK</span>
+                  </div>
+                  <ul class="accountHistoryList" id="accountRewardHistoryList"></ul>
                 </div>
                 <div id="accountFeedback"></div>
               </div>
