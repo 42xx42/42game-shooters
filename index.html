@@ -1894,6 +1894,32 @@
       font-weight: 700;
     }
 
+    #accountRedeemInput {
+      flex: 1 1 140px;
+      min-width: 0;
+      padding: 8px 12px;
+      border-radius: 10px;
+      border: 1px solid rgba(126, 220, 255, 0.24);
+      background: rgba(126, 220, 255, 0.08);
+      color: #eaf9ff;
+      font-size: 13px;
+      font-weight: 600;
+      outline: none;
+    }
+
+    #accountRedeemInput::placeholder {
+      color: rgba(234, 249, 255, 0.42);
+    }
+
+    #accountRedeemInput:focus {
+      border-color: rgba(126, 220, 255, 0.5);
+      background: rgba(126, 220, 255, 0.14);
+    }
+
+    .accountRedeemCard #accountRedeemBtn {
+      flex: 0 0 auto;
+    }
+
     .accountHistoryCard {
       margin-top: 14px;
       padding: 12px 14px;
@@ -2614,6 +2640,11 @@
                   <span class="accountCodeLabel" id="accountCodeLabel">最近领取的 CDK</span>
                   <code id="accountCodeValue">-</code>
                   <button class="accountBtn secondary small" id="accountCopyBtn" type="button" hidden>复制</button>
+                </div>
+                <div class="accountCodeCard accountRedeemCard" id="accountRedeemCard" hidden>
+                  <span class="accountCodeLabel">兑换码</span>
+                  <input type="text" id="accountRedeemInput" placeholder="输入兑换码" autocomplete="off" maxlength="120" />
+                  <button class="accountBtn small" id="accountRedeemBtn" type="button">兑换</button>
                 </div>
                 <div class="accountHistoryCard" id="accountRewardHistory" hidden>
                   <div class="accountHistoryHead">

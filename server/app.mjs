@@ -2769,6 +2769,7 @@ export function createApp(options = {}) {
   const appConfigFile = path.join(dataDir, 'app-config.json');
   const pvpEventSignupsFile = path.join(dataDir, 'pvp-event-signups.json');
   const pvpEventLeaderboardFile = path.join(dataDir, 'pvp-event-leaderboard.json');
+  const redeemCodesFile = path.join(dataDir, 'redeem-codes.json');
   const pvpReplaysDir = path.join(dataDir, 'pvp-replays');
   let pvpSweepTimer = null;
 
@@ -2798,6 +2799,10 @@ export function createApp(options = {}) {
     await ensureJsonFile(pvpEventLeaderboardFile, {
       version: 1,
       snapshot: null
+    });
+    await ensureJsonFile(redeemCodesFile, {
+      version: 1,
+      codes: []
     });
   }
 
@@ -3343,6 +3348,92 @@ export function createApp(options = {}) {
       version: 1,
       signups: Array.isArray(store?.signups) ? store.signups.map((entry) => summarizePvpEventSignup(entry)).filter(Boolean) : []
     });
+  }
+
+  function summarizeRedeemCode(entry) {
+    if (!entry || typeof entry !== 'object') {
+      return null;
+    }
+
+    const quota = normalizeNonNegativeInteger(entry.creditAmountQuota, 0);
+    return {
+      code: String(entry.code || ''),
+      creditAmountQuota: quota,
+      note: typeof entry.note === 'string' ? entry.note.slice(0, 200) : '',
+      status: entry.status === 'disabled' ? 'disabled' : 'active',
+      maxClaimsPerUser: Math.max(1, normalizeNonNegativeInteger(entry.maxClaimsPerUser, 1)),
+      createdAt: entry.createdAt || null,
+      createdBy: entry.createdBy || null,
+      claims: Array.isArray(entry.claims)
+        ? entry.claims
+            .map((claim) =>
+              claim && typeof claim === 'object'
+                ? {
+                    userKey: String(claim.userKey || ''),
+                    claimedAt: claim.claimedAt || null,
+                    deliveryStatus: claim.deliveryStatus || 'delivered'
+                  }
+                : null
+            )
+            .filter(Boolean)
+        : []
+    };
+  }
+
+  function summarizeRedeemCodeForAdmin(entry) {
+    const summary = summarizeRedeemCode(entry);
+    if (!summary) {
+      return null;
+    }
+
+    return {
+      ...summary,
+      claimCount: summary.claims.length
+    };
+  }
+
+  async function readRedeemCodeStore() {
+    const store = await readJsonFile(redeemCodesFile, {
+      version: 1,
+      codes: []
+    });
+
+    if (!Array.isArray(store.codes)) {
+      return { version: 1, codes: [] };
+    }
+
+    return {
+      version: Math.max(Number(store.version) || 1, 1),
+      codes: store.codes.map((entry) => summarizeRedeemCode(entry)).filter((entry) => entry && entry.code)
+    };
+  }
+
+  async function writeRedeemCodeStore(store) {
+    await writeJsonFile(redeemCodesFile, {
+      version: 1,
+      codes: Array.isArray(store?.codes) ? store.codes.map((entry) => summarizeRedeemCode(entry)).filter(Boolean) : []
+    });
+  }
+
+  function findRedeemCode(store, code) {
+    const normalized = String(code || '').trim();
+    if (!normalized) {
+      return null;
+    }
+
+    return (
+      (Array.isArray(store?.codes) ? store.codes : []).find(
+        (entry) => entry && entry.code === normalized
+      ) || null
+    );
+  }
+
+  function countRedeemClaimsForUser(entry, userKey) {
+    if (!entry || !userKey) {
+      return 0;
+    }
+
+    return entry.claims.filter((claim) => claim.userKey === userKey).length;
   }
 
   function getPvpEventSignupsForConfig(store, eventConfig) {
@@ -5545,6 +5636,88 @@ export function createApp(options = {}) {
     });
   }
 
+  async function handleRedeemCode(req, res) {
+    if (req.method !== 'POST') {
+      sendMethodNotAllowed(res);
+      return;
+    }
+
+    const payload = await requireUser(req, res);
+    if (!payload) return;
+
+    let body;
+    try {
+      body = await readJsonBody(req);
+    } catch (error) {
+      sendJson(res, 400, {
+        error: error.message === 'request_too_large' ? 'request_too_large' : 'invalid_json'
+      });
+      return;
+    }
+
+    const code = typeof body?.code === 'string' ? body.code.trim() : '';
+    if (!code) {
+      sendJson(res, 400, { error: 'missing_code' });
+      return;
+    }
+
+    const userKey = getUserKey(payload.user);
+    const rewardDelivery = payload.rewardDelivery;
+
+    const deliveryResult = await withUserRewardDeliveryLock(userKey, async () => {
+      const store = await readRedeemCodeStore();
+      const entry = findRedeemCode(store, code);
+
+      if (!entry) {
+        return { status: 404, body: { error: 'redeem_code_not_found' } };
+      }
+
+      if (entry.status === 'disabled') {
+        return { status: 409, body: { error: 'redeem_code_disabled' } };
+      }
+
+      const existingClaims = countRedeemClaimsForUser(entry, userKey);
+      if (existingClaims >= entry.maxClaimsPerUser) {
+        return { status: 409, body: { error: 'already_redeemed' } };
+      }
+
+      const creditAmountQuota = entry.creditAmountQuota;
+      if (creditAmountQuota <= 0) {
+        return { status: 409, body: { error: 'redeem_code_invalid' } };
+      }
+
+      const creditResult = await creditNewApiQuotaForUser(payload.user, creditAmountQuota, rewardDelivery);
+      const claim = {
+        userKey,
+        claimedAt: getNowIso(),
+        deliveryStatus: creditResult.deliveryStatus || 'delivered',
+        deliveryError: creditResult.deliveryError || null
+      };
+
+      const targetEntry = findRedeemCode(store, code);
+      if (targetEntry) {
+        targetEntry.claims.push(claim);
+        await writeRedeemCodeStore(store);
+      }
+
+      return {
+        status: 200,
+        body: {
+          newlyClaimed: true,
+          code: entry.code,
+          note: entry.note || '',
+          deliveryStatus: creditResult.deliveryStatus || 'delivered',
+          deliveryError: creditResult.deliveryError || null,
+          creditAmountQuota,
+          creditAmountLabel: formatCreditAmountLabel(creditAmountQuota, rewardDelivery),
+          creditedAt: creditResult.creditedAt || null
+        }
+      };
+    });
+
+    sendJson(res, deliveryResult.status, deliveryResult.body);
+  }
+
   async function handleAdminListCdks(req, res) {
     const payload = await requireAdmin(req, res);
     if (!payload) return;
@@ -6081,6 +6254,118 @@ export function createApp(options = {}) {
     });
   }
 
+  async function handleAdminListRedeemCodes(req, res) {
+    const payload = await requireAdmin(req, res);
+    if (!payload) return;
+
+    const store = await readRedeemCodeStore();
+    sendJson(res, 200, {
+      codes: store.codes.map(summarizeRedeemCodeForAdmin)
+    });
+  }
+
+  async function handleAdminUpsertRedeemCode(req, res) {
+    if (req.method !== 'POST') {
+      sendMethodNotAllowed(res);
+      return;
+    }
+
+    const payload = await requireAdmin(req, res);
+    if (!payload) return;
+
+    let body;
+    try {
+      body = await readJsonBody(req);
+    } catch (error) {
+      sendJson(res, 400, {
+        error: error.message === 'request_too_large' ? 'request_too_large' : 'invalid_json'
+      });
+      return;
+    }
+
+    const code = typeof body?.code === 'string' ? body.code.trim() : '';
+    if (!code) {
+      sendJson(res, 400, { error: 'missing_code' });
+      return;
+    }
+
+    const creditAmountQuota = normalizeNonNegativeInteger(body?.creditAmountQuota, 0);
+    if (creditAmountQuota <= 0) {
+      sendJson(res, 400, { error: 'invalid_amount' });
+      return;
+    }
+
+    const note = typeof body?.note === 'string' ? body.note.trim().slice(0, 200) : '';
+    const status = body?.status === 'disabled' ? 'disabled' : 'active';
+    const maxClaimsPerUser = Math.max(1, normalizeNonNegativeInteger(body?.maxClaimsPerUser, 1));
+    const now = getNowIso();
+
+    const store = await readRedeemCodeStore();
+    const existing = findRedeemCode(store, code);
+    const summary = {
+      code,
+      creditAmountQuota,
+      note,
+      status,
+      maxClaimsPerUser,
+      createdAt: existing?.createdAt || now,
+      createdBy: existing?.createdBy || summarizeUser(payload.user),
+      claims: existing?.claims || []
+    };
+
+    if (existing) {
+      Object.assign(existing, summary);
+    } else {
+      store.codes.push(summary);
+    }
+
+    await writeRedeemCodeStore(store);
+
+    sendJson(res, 200, {
+      code: summarizeRedeemCodeForAdmin(summary),
+      created: !existing
+    });
+  }
+
+  async function handleAdminToggleRedeemCode(req, res) {
+    if (req.method !== 'POST') {
+      sendMethodNotAllowed(res);
+      return;
+    }
+
+    const payload = await requireAdmin(req, res);
+    if (!payload) return;
+
+    let body;
+    try {
+      body = await readJsonBody(req);
+    } catch (error) {
+      sendJson(res, 400, {
+        error: error.message === 'request_too_large' ? 'request_too_large' : 'invalid_json'
+      });
+      return;
+    }
+
+    const code = typeof body?.code === 'string' ? body.code.trim() : '';
+    if (!code) {
+      sendJson(res, 400, { error: 'missing_code' });
+      return;
+    }
+
+    const status = body?.status === 'active' ? 'active' : 'disabled';
+    const store = await readRedeemCodeStore();
+    const entry = findRedeemCode(store, code);
+    if (!entry) {
+      sendJson(res, 404, { error: 'redeem_code_not_found' });
+      return;
+    }
+
+    entry.status = status;
+    await writeRedeemCodeStore(store);
+
+    sendJson(res, 200, { code: summarizeRedeemCodeForAdmin(entry) });
+  }
+
   function sendPvpError(req, res, error) {
     sendJson(
       res,
@@ -6400,6 +6685,25 @@ export function createApp(options = {}) {
 
     if (requestUrl.pathname === '/api/cdks/claim' || requestUrl.pathname === '/api/rewards/claim') {
       await handleClaimCdk(req, res);
+      return;
+    }
+
+    if (requestUrl.pathname === '/api/redeem' && req.method === 'POST') {
+      await handleRedeemCode(req, res);
+      return;
+    }
+
+    if (requestUrl.pathname === '/api/admin/redeem-codes' && req.method === 'GET') {
+      await handleAdminListRedeemCodes(req, res);
+      return;
+    }
+
+    if (requestUrl.pathname === '/api/admin/redeem-codes' && req.method === 'POST') {
+      if (req.headers['x-redeem-action'] === 'toggle') {
+        await handleAdminToggleRedeemCode(req, res);
+      } else {
+        await handleAdminUpsertRedeemCode(req, res);
+      }
       return;
     }
 

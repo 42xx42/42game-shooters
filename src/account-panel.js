@@ -27,7 +27,10 @@ const elements = {
   matchCodeCard: document.getElementById('matchAwardCodeCard'),
   matchCodeValue: document.getElementById('matchAwardCodeValue'),
   matchCopyButton: document.getElementById('matchAwardCopyBtn'),
-  matchFeedback: document.getElementById('matchAwardFeedback')
+  matchFeedback: document.getElementById('matchAwardFeedback'),
+  redeemCard: document.getElementById('accountRedeemCard'),
+  redeemInput: document.getElementById('accountRedeemInput'),
+  redeemButton: document.getElementById('accountRedeemBtn')
 };
 
 const model = {
@@ -440,6 +443,7 @@ function renderSignedOut(session) {
   elements.claimButton.hidden = true;
   elements.logoutButton.hidden = true;
   elements.adminLink.hidden = true;
+  if (elements.redeemCard) elements.redeemCard.hidden = true;
   renderLatestClaim(null);
   renderRewardHistory(null);
 }
@@ -500,6 +504,7 @@ function renderSignedIn(session, rewards) {
   elements.loginButton.hidden = true;
   elements.logoutButton.hidden = false;
   elements.adminLink.hidden = !session.isAdmin;
+  if (elements.redeemCard) elements.redeemCard.hidden = false;
   renderLatestClaim(rewards?.latestClaim || null);
   renderRewardHistory(rewards || null);
 }
@@ -783,6 +788,63 @@ async function claimCode() {
     setMatchFeedback(message, tone);
   } finally {
     setLoadingState(false);
+  }
+}
+
+async function redeemCode() {
+  if (!elements.redeemInput || !elements.redeemButton) return;
+
+  const code = elements.redeemInput.value.trim();
+  if (!code) {
+    setFeedback('请先输入兑换码。', 'warn');
+    elements.redeemInput.focus();
+    return;
+  }
+
+  elements.redeemButton.disabled = true;
+  setFeedback('正在兑换...');
+
+  try {
+    const result = await apiRequest('/api/redeem', {
+      method: 'POST',
+      body: { code }
+    });
+
+    const label = result.creditAmountLabel || '奖励';
+    if (result.deliveryStatus === 'awaiting_newapi_account') {
+      setFeedback('兑换码已记录，但请先去 42 API 用同一个 Linux.do 账号登录一次，再回来重试。', 'warn');
+    } else if (result.deliveryStatus === 'delivery_failed' || result.deliveryStatus === 'delivery_unavailable') {
+      setFeedback(`兑换码有效，但 ${label} 发放暂时失败，请稍后重试。`, 'warn');
+    } else {
+      setFeedback(`兑换成功！${label} 已发到 42 API。`, 'ok');
+      elements.redeemInput.value = '';
+    }
+  } catch (error) {
+    const tone =
+      error.message === 'already_redeemed' ||
+      error.message === 'redeem_code_disabled' ||
+      error.message === 'awaiting_newapi_account'
+        ? 'warn'
+        : 'error';
+
+    let message = error.message;
+    if (error.message === 'redeem_code_not_found') {
+      message = '兑换码无效，请检查后重试。';
+    } else if (error.message === 'already_redeemed') {
+      message = '你已经兑换过这个码了。';
+    } else if (error.message === 'redeem_code_disabled') {
+      message = '这个兑换码已经失效了。';
+    } else if (error.message === 'awaiting_newapi_account') {
+      message = '请先去 42 API 用同一个 Linux.do 账号登录一次，再来兑换。';
+    } else if (error.message === 'delivery_unavailable' || error.message === 'delivery_failed') {
+      message = '42 API 发放暂时不可用，请稍后再试。';
+    } else if (error.message === 'not_authenticated') {
+      message = '请先登录后再兑换。';
+    }
+
+    setFeedback(message, tone);
+  } finally {
+    elements.redeemButton.disabled = false;
   }
 }
 
@@ -1095,6 +1157,13 @@ function bindEvents() {
   elements.logoutButton?.addEventListener('click', logout);
   elements.copyButton?.addEventListener('click', () => copyValue(elements.codeValue.textContent.trim(), 'menu'));
   elements.matchCopyButton?.addEventListener('click', () => copyValue(elements.matchCodeValue.textContent.trim(), 'match'));
+  elements.redeemButton?.addEventListener('click', redeemCode);
+  elements.redeemInput?.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      redeemCode();
+    }
+  });
   elements.loginButton?.addEventListener('click', (event) => {
     if (elements.loginButton.classList.contains('is-disabled')) {
       event.preventDefault();
