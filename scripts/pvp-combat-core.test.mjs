@@ -509,6 +509,15 @@ test('non-default maps use their own spawn layout and preserve map metadata', ()
         [-20.4, 12.6],
         [20.4, -12.6]
       ]
+    },
+    {
+      mapId: 'backalley',
+      expectedSpawns: [
+        [-16, -9.6],
+        [15.2, 8.8],
+        [-2.8, 10.2],
+        [14.8, -8.6]
+      ]
     }
   ];
 
