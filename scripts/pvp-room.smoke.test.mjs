@@ -155,6 +155,7 @@ async function startPvpApp(context, options = {}) {
     },
     now: () => nowMs,
     pvpSweepIntervalMs: options.pvpSweepIntervalMs || 250,
+    pvpServiceOptions: options.pvpServiceOptions,
     fetchImpl: createMockLinuxDoFetch(usersByCode)
   });
 
@@ -484,6 +485,17 @@ class TestWebSocketClient {
 
   sendJson(payload) {
     this.socket.write(createClientFrame(0x1, JSON.stringify(payload)));
+  }
+
+  sendText(payloadText) {
+    this.socket.write(createClientFrame(0x1, payloadText));
+  }
+
+  async waitForClose(timeoutMs = 2500) {
+    await Promise.race([
+      this.closePromise,
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Timed out waiting for socket close')), timeoutMs))
+    ]);
   }
 
   async close() {
@@ -1805,6 +1817,130 @@ test('matchmaking creates duel and deathmatch rooms with service-side room owner
     assert.equal(bootstrapResult.payload.currentRoom.capacity, 4);
     assert.equal(bootstrapResult.payload.currentRoom.source, 'matchmaking');
   }
+});
+
+test('oversized websocket messages are closed before they reach the PVP handler', async (context) => {
+  const { baseUrl } = await startPvpApp(context, {
+    pvpServiceOptions: {
+      maxWebSocketMessageBytes: 128,
+      maxWebSocketBufferBytes: 256
+    }
+  });
+
+  const aliceCookie = await loginAs(baseUrl, USERS.alice);
+  const aliceBootstrap = await apiJson(baseUrl, '/api/pvp/bootstrap', {
+    cookie: aliceCookie
+  });
+  const aliceWs = await TestWebSocketClient.connect(aliceBootstrap.payload.wsUrl, {
+    cookie: aliceCookie
+  });
+
+  context.after(async () => {
+    await aliceWs.close();
+  });
+
+  await aliceWs.waitForType('pvp.session.synced');
+  aliceWs.sendText('x'.repeat(256));
+  await aliceWs.waitForClose();
+  assert.equal(aliceWs.closed, true);
+});
+
+test('combat tick failures abort the affected match and emit diagnostics instead of hanging forever', async (context) => {
+  const logs = [];
+  const { baseUrl } = await startPvpApp(context, {
+    pvpServiceOptions: {
+      stepCombatState() {
+        throw new Error('forced_tick_failure');
+      },
+      logError(...args) {
+        logs.push(args);
+      }
+    }
+  });
+
+  const aliceCookie = await loginAs(baseUrl, USERS.alice);
+  const bobCookie = await loginAs(baseUrl, USERS.bob);
+  const aliceBootstrap = await apiJson(baseUrl, '/api/pvp/bootstrap', {
+    cookie: aliceCookie
+  });
+  const bobBootstrap = await apiJson(baseUrl, '/api/pvp/bootstrap', {
+    cookie: bobCookie
+  });
+
+  const aliceWs = await TestWebSocketClient.connect(aliceBootstrap.payload.wsUrl, {
+    cookie: aliceCookie
+  });
+  const bobWs = await TestWebSocketClient.connect(bobBootstrap.payload.wsUrl, {
+    cookie: bobCookie
+  });
+
+  context.after(async () => {
+    await aliceWs.close();
+    await bobWs.close();
+  });
+
+  await aliceWs.waitForType('pvp.session.synced');
+  await bobWs.waitForType('pvp.session.synced');
+
+  const createRoomResult = await apiJson(baseUrl, '/api/pvp/rooms', {
+    method: 'POST',
+    cookie: aliceCookie,
+    body: {
+      mode: 'duel'
+    }
+  });
+  assert.equal(createRoomResult.response.status, 200);
+  const roomCode = createRoomResult.payload.room.roomCode;
+
+  const joinRoomResult = await apiJson(baseUrl, '/api/pvp/rooms/join', {
+    method: 'POST',
+    cookie: bobCookie,
+    body: {
+      roomCode
+    }
+  });
+  assert.equal(joinRoomResult.response.status, 200);
+
+  const aliceReadyResult = await apiJson(baseUrl, '/api/pvp/rooms/ready', {
+    method: 'POST',
+    cookie: aliceCookie,
+    body: {
+      ready: true
+    }
+  });
+  assert.equal(aliceReadyResult.response.status, 200);
+
+  const bobReadyResult = await apiJson(baseUrl, '/api/pvp/rooms/ready', {
+    method: 'POST',
+    cookie: bobCookie,
+    body: {
+      ready: true
+    }
+  });
+  assert.equal(bobReadyResult.response.status, 200);
+
+  const startRoomResult = await apiJson(baseUrl, '/api/pvp/rooms/start', {
+    method: 'POST',
+    cookie: aliceCookie
+  });
+  assert.equal(startRoomResult.response.status, 200);
+
+  const aliceAborted = await aliceWs.waitForType(
+    'pvp.match.aborted',
+    (message) => message.reason === 'match_runtime_error',
+    4000
+  );
+  const bobAborted = await bobWs.waitForType(
+    'pvp.match.aborted',
+    (message) => message.reason === 'match_runtime_error',
+    4000
+  );
+
+  assert.equal(aliceAborted.matchId, bobAborted.matchId);
+  assert.equal(aliceAborted.mode, 'duel');
+  const tickFailureLog = logs.find((entry) => String(entry[0] || '').includes('match_tick_failed'));
+  assert.ok(tickFailureLog);
+  assert.match(String(tickFailureLog[1]?.error?.message || ''), /forced_tick_failure/u);
 });
 
 test('disconnects go offline first, then get cleaned from rooms and queues after timeout', async (context) => {

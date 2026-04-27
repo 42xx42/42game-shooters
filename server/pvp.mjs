@@ -26,6 +26,8 @@ import {
 
 const WS_MAGIC = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11';
 const ROOM_CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+const DEFAULT_MAX_WS_MESSAGE_BYTES = 4 * 1024;
+const DEFAULT_MAX_WS_BUFFER_BYTES = 64 * 1024;
 
 const DEFAULT_PVP_REPLAY_CONFIG = Object.freeze({
   enabled: false,
@@ -133,6 +135,19 @@ function createPvpError(code, status = 400, details = {}) {
   error.status = status;
   error.details = details;
   return error;
+}
+
+function logPvpServiceError(logError, label, error, context = {}) {
+  try {
+    logError(`[pvp] ${label}`, {
+      ...context,
+      error: {
+        code: error?.code || null,
+        message: error?.message || String(error),
+        stack: error?.stack || null
+      }
+    });
+  } catch {}
 }
 
 function normalizeUser(user) {
@@ -310,7 +325,11 @@ function createWebSocketFrame(opcode, payloadBuffer) {
   return Buffer.concat([header, payload]);
 }
 
-function tryParseWebSocketFrames(buffer) {
+function tryParseWebSocketFrames(buffer, options = {}) {
+  const maxPayloadBytes = Math.max(
+    1,
+    normalizeNonNegativeInteger(options.maxPayloadBytes, DEFAULT_MAX_WS_MESSAGE_BYTES)
+  );
   const frames = [];
   let offset = 0;
 
@@ -335,6 +354,13 @@ function tryParseWebSocketFrames(buffer) {
       if (cursor + 8 > buffer.length) break;
       payloadLength = Number(buffer.readBigUInt64BE(cursor));
       cursor += 8;
+    }
+
+    if (payloadLength > maxPayloadBytes) {
+      throw createPvpError('ws_message_too_large', 413, {
+        payloadLength,
+        maxPayloadBytes
+      });
     }
 
     const maskingKeyLength = masked ? 4 : 0;
@@ -362,7 +388,15 @@ function tryParseWebSocketFrames(buffer) {
   };
 }
 
-function upgradeToWebSocket(req, socket, head, handlers) {
+function upgradeToWebSocket(req, socket, head, handlers, options = {}) {
+  const maxMessageBytes = Math.max(
+    1,
+    normalizeNonNegativeInteger(options.maxMessageBytes, DEFAULT_MAX_WS_MESSAGE_BYTES)
+  );
+  const maxBufferBytes = Math.max(
+    maxMessageBytes,
+    normalizeNonNegativeInteger(options.maxBufferBytes, DEFAULT_MAX_WS_BUFFER_BYTES)
+  );
   const key = String(req.headers['sec-websocket-key'] || '').trim();
   if (!key) {
     throw createPvpError('ws_missing_key', 400);
@@ -437,14 +471,29 @@ function upgradeToWebSocket(req, socket, head, handlers) {
 
   socket.on('data', (chunk) => {
     if (closed) return;
+
+    if (buffer.length + chunk.length > maxBufferBytes) {
+      handlers.onError?.(
+        createPvpError('ws_message_too_large', 413, {
+          bufferLength: buffer.length,
+          chunkLength: chunk.length,
+          maxBufferBytes
+        })
+      );
+      peer.close(1009, 'message_too_large');
+      return;
+    }
+
     buffer = Buffer.concat([buffer, chunk]);
 
     let parsed;
     try {
-      parsed = tryParseWebSocketFrames(buffer);
+      parsed = tryParseWebSocketFrames(buffer, {
+        maxPayloadBytes: maxMessageBytes
+      });
     } catch (error) {
       handlers.onError?.(error);
-      peer.close(1003, 'invalid_frame');
+      peer.close(error?.code === 'ws_message_too_large' ? 1009 : 1003, error?.code || 'invalid_frame');
       return;
     }
 
@@ -491,6 +540,17 @@ export function createPvpService(options = {}) {
     typeof options.onMatchFinished === 'function' ? options.onMatchFinished : async () => {};
   const createReplayRecorder =
     typeof options.createReplayRecorder === 'function' ? options.createReplayRecorder : async () => null;
+  const stepCombatStateImpl =
+    typeof options.stepCombatState === 'function' ? options.stepCombatState : stepCombatState;
+  const logError = typeof options.logError === 'function' ? options.logError : (...args) => console.error(...args);
+  const maxWebSocketMessageBytes = Math.max(
+    1,
+    normalizeNonNegativeInteger(options.maxWebSocketMessageBytes, DEFAULT_MAX_WS_MESSAGE_BYTES)
+  );
+  const maxWebSocketBufferBytes = Math.max(
+    maxWebSocketMessageBytes,
+    normalizeNonNegativeInteger(options.maxWebSocketBufferBytes, DEFAULT_MAX_WS_BUFFER_BYTES)
+  );
 
   const rooms = new Map();
   const roomMembershipByUser = new Map();
@@ -505,9 +565,21 @@ export function createPvpService(options = {}) {
   const spectatorMatchIdByUser = new Map();
 
   const matchTickTimer = setInterval(() => {
-    tickMatches().catch(() => {});
+    tickMatches().catch((error) => {
+      logPvpServiceError(logError, 'tick_loop_failed', error);
+    });
   }, COMBAT_TICK_MS);
   matchTickTimer.unref?.();
+
+  function buildRuntimeErrorContext(runtime) {
+    return {
+      matchId: runtime?.matchId || null,
+      roomId: runtime?.roomId || null,
+      mode: runtime?.mode || null,
+      mapId: runtime?.mapId || runtime?.state?.mapId || null,
+      tick: Number.isFinite(Number(runtime?.state?.tick)) ? Number(runtime.state.tick) : null
+    };
+  }
 
   async function readConfig() {
     return normalizePvpConfig(await Promise.resolve(getConfig()));
@@ -972,7 +1044,12 @@ export function createPvpService(options = {}) {
       aborted: true,
       reason,
       result: runtime.state.result
-    }).catch(() => {});
+    }).catch((error) => {
+      logPvpServiceError(logError, 'finish_runtime_failed', error, {
+        ...buildRuntimeErrorContext(runtime),
+        reason
+      });
+    });
   }
 
   async function createRuntimeForRoom(room, config = null) {
@@ -1537,7 +1614,15 @@ export function createPvpService(options = {}) {
     for (const runtime of [...liveMatches.values()]) {
       if (runtime.finished) continue;
 
-      const result = stepCombatState(runtime.state, runtime.inputByUserKey);
+      let result;
+      try {
+        result = stepCombatStateImpl(runtime.state, runtime.inputByUserKey);
+      } catch (error) {
+        logPvpServiceError(logError, 'match_tick_failed', error, buildRuntimeErrorContext(runtime));
+        abortRuntime(runtime, 'match_runtime_error');
+        continue;
+      }
+
       runtime.lastScoreboard = result.scoreboard;
 
       for (const event of result.events) {
@@ -1814,6 +1899,9 @@ export function createPvpService(options = {}) {
           } catch {}
         }
       }
+    }, {
+      maxMessageBytes: maxWebSocketMessageBytes,
+      maxBufferBytes: maxWebSocketBufferBytes
     });
 
     connectionId = randomUUID();

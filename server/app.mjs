@@ -2829,6 +2829,7 @@ export function createApp(options = {}) {
   }
 
   const pvpService = createPvpService({
+    ...(options.pvpServiceOptions && typeof options.pvpServiceOptions === 'object' ? options.pvpServiceOptions : {}),
     getNowMs,
     getNowIso,
     async getConfig() {
@@ -5396,7 +5397,9 @@ export function createApp(options = {}) {
     async start() {
       await ensureDataFiles();
       pvpSweepTimer = setInterval(() => {
-        pvpService.cleanup().catch(() => {});
+        pvpService.cleanup().catch((error) => {
+          console.error('[pvp] cleanup failed', error);
+        });
       }, pvpSweepIntervalMs);
       await new Promise((resolve, reject) => {
         server.once('error', reject);
