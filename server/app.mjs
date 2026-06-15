@@ -797,7 +797,7 @@ function verifyPvpEdgeAccessToken(token, secret, nowMs = Date.now()) {
     user: {
       id: String(user.id),
       username: String(user.username),
-      displayName: String(user.displayName || user.username),
+      displayName: String(user.username || user.displayName),
       avatarUrl: user.avatarUrl || null
     }
   };
@@ -1035,13 +1035,7 @@ function normalizeLinuxDoProfile(profile) {
   }
 
   const resolvedUsername = String(username || `user-${rawId}`);
-  const displayName = String(
-    nestedUser.name ??
-      source.name ??
-      nestedUser.nickname ??
-      source.nickname ??
-      resolvedUsername
-  );
+  const displayName = resolvedUsername;
 
   return {
     id: String(rawId || resolvedUsername),
@@ -1068,7 +1062,7 @@ function summarizeUser(user) {
   return {
     id: user.id,
     username: user.username,
-    displayName: user.displayName,
+    displayName: user.username || user.displayName || user.id,
     avatarUrl: user.avatarUrl || null
   };
 }
@@ -1083,7 +1077,7 @@ function normalizeStoredUser(input) {
   return summarizeUser({
     id: String(id),
     username: String(source.username || ''),
-    displayName: String(source.displayName || source.username || source.id || id),
+    displayName: String(source.username || source.displayName || source.id || id),
     avatarUrl: source.avatarUrl || null
   });
 }
@@ -1209,9 +1203,11 @@ function mergeReplayPlayerDirectory(metaPlayers, resultStats, matchRecords) {
           ? String(entry.username)
           : previous.username || '',
       displayName:
-        entry?.displayName !== undefined && entry?.displayName !== null && entry?.displayName !== ''
-          ? String(entry.displayName)
-          : previous.displayName || previous.username || key,
+        entry?.username !== undefined && entry?.username !== null && entry?.username !== ''
+          ? String(entry.username)
+          : entry?.displayName !== undefined && entry?.displayName !== null && entry?.displayName !== ''
+            ? String(entry.displayName)
+            : previous.username || previous.displayName || key,
       team:
         entry?.team !== undefined && entry?.team !== null && entry?.team !== ''
           ? String(entry.team)
@@ -1396,8 +1392,8 @@ function buildReplayDetailPayload(replay, matchRecords) {
   const normalizedRecords = matchRecords
     .map((record) => summarizeMatchRecord(record))
     .sort((left, right) =>
-      String(left.user?.displayName || left.user?.username || left.user?.id || '').localeCompare(
-        String(right.user?.displayName || right.user?.username || right.user?.id || '')
+      String(left.user?.username || left.user?.displayName || left.user?.id || '').localeCompare(
+        String(right.user?.username || right.user?.displayName || right.user?.id || '')
       )
     );
   const replaySummary = summarizeReplayRecord(replay);
@@ -3158,7 +3154,8 @@ export function createApp(options = {}) {
             ? {
                 id: entry.claimedBy.id,
                 username: entry.claimedBy.username,
-                displayName: entry.claimedBy.displayName,
+                displayName:
+                  entry.claimedBy.username || entry.claimedBy.displayName || entry.claimedBy.id,
                 avatarUrl: entry.claimedBy.avatarUrl || null
               }
             : null,
@@ -3302,8 +3299,8 @@ export function createApp(options = {}) {
         playerIsMvp: String(stat.userId) === String(result.mvpUserId),
         eligibleForAward: false,
         mvpTeam: mvpStat?.team || result.winnerTeam || null,
-        mvpName: mvpStat?.displayName || mvpStat?.username || null,
-        playerName: userInfo?.displayName || stat.displayName || stat.username || stat.userId,
+        mvpName: mvpStat?.username || mvpStat?.displayName || null,
+        playerName: userInfo?.username || userInfo?.displayName || stat.username || stat.displayName || stat.userId,
         matchDurationSeconds: getServerObservedDurationSeconds(startedAt, completedAt),
         playerStats: {
           kills: Number(stat.kills || 0),
@@ -3340,7 +3337,8 @@ export function createApp(options = {}) {
         user: {
           id: String(stat.userId),
           username: userInfo?.username || stat.username || '',
-          displayName: userInfo?.displayName || stat.displayName || stat.username || stat.userId,
+          displayName:
+            userInfo?.username || userInfo?.displayName || stat.username || stat.displayName || stat.userId,
           avatarUrl: null
         },
         summary,

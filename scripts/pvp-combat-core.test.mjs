@@ -6,12 +6,14 @@ import {
   buildCombatSnapshot,
   COMBAT_TICK_MS,
   PVP_COMBAT_ARENA,
+  PVP_COMBAT_MODES,
   PVP_COMBAT_OBSTACLES,
   PVP_COMBAT_PLAYER,
   createInitialCombatState,
   predictLocalPlayerState,
   stepCombatState
 } from '../src/pvp-combat-core.mjs';
+import { PVP_MAPS } from '../src/pvp-map-catalog.mjs';
 
 function aimToward(from, to) {
   return Math.atan2((to.x || 0) - (from.x || 0), (to.z || 0) - (from.z || 0));
@@ -419,6 +421,44 @@ test('deathmatch respawns choose the safest available spawn instead of the seat 
   assert.equal(respawningPlayer.lives, 2);
   assert.equal(respawningPlayer.x, 0);
   assert.equal(respawningPlayer.z, 7.2);
+});
+
+test('deathmatch simultaneous respawns stay unique on every map', () => {
+  const capacity = PVP_COMBAT_MODES.deathmatch.capacity;
+
+  for (const [mapId, definition] of Object.entries(PVP_MAPS)) {
+    assert.equal(
+      definition.combat.spawnByMode.deathmatch.length,
+      capacity,
+      `${mapId} deathmatch spawn count must match room capacity`
+    );
+
+    const state = createInitialCombatState({
+      matchId: `deathmatch-respawn-unique-${mapId}`,
+      mode: 'deathmatch',
+      mapId,
+      players: makePlayers(capacity)
+    });
+
+    state.players.forEach((player) => {
+      player.alive = false;
+      player.eliminated = false;
+      player.hp = 0;
+      player.lives = 2;
+      player.respawnTicks = 1;
+    });
+
+    const result = stepCombatState(state, new Map());
+    const respawnEvents = result.events.filter((event) => event.type === 'respawn');
+    const occupiedSpawns = new Set(state.players.map((player) => `${player.x},${player.z}`));
+
+    assert.equal(respawnEvents.length, capacity, `${mapId} should respawn every player in the tick`);
+    assert.equal(
+      occupiedSpawns.size,
+      capacity,
+      `${mapId} simultaneous respawns should land on unique spawn points`
+    );
+  }
 });
 
 test('shots are blocked by combat obstacles before reaching the target', () => {

@@ -469,7 +469,7 @@ function summarizeLeaderboardPreview(items) {
     .slice(0, 3)
     .map(
       (entry) =>
-        `#${Number(entry.rank || 0)} ${entry.user?.displayName || entry.user?.username || entry.user?.id} ${Number(
+        `#${Number(entry.rank || 0)} ${entry.user?.username || entry.user?.displayName || entry.user?.id} ${Number(
           entry.score || 0
         )}杯`
     )
@@ -485,7 +485,7 @@ function summarizeRecentSignups(items) {
     .slice(0, 5)
     .map(
       (entry) =>
-        `${entry.user?.displayName || entry.user?.username || entry.user?.id} @ ${new Date(
+        `${entry.user?.username || entry.user?.displayName || entry.user?.id} @ ${new Date(
           entry.signedUpAt
         ).toLocaleString()}`
     )

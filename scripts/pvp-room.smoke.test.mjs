@@ -718,6 +718,14 @@ test('private duel room starts a live match on the selected map and authoritativ
   assert.equal(aliceMatchStarted.matchId, bobMatchStarted.matchId);
   assert.equal(aliceMatchStarted.snapshot.players.length, 2);
   assert.equal(bobMatchStarted.snapshot.players.length, 2);
+  assert.equal(
+    aliceMatchStarted.snapshot.players.find((player) => player.team === 'p1')?.displayName,
+    'alice'
+  );
+  assert.equal(
+    aliceMatchStarted.snapshot.players.find((player) => player.team === 'p2')?.displayName,
+    'bob'
+  );
   assert.equal(aliceMatchStarted.mapId, 'frontier');
   assert.equal(aliceMatchStarted.snapshot.mapId, 'frontier');
   assert.equal(aliceMatchStarted.team, 'p1');

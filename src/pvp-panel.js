@@ -328,6 +328,32 @@ function ensureStyles() {
         flex-direction: column;
         align-items: stretch;
       }
+      .pvp-row .pvp-input {
+        width: 100%;
+      }
+      .pvp-row .accountBtn,
+      .pvp-actions .accountBtn {
+        min-height: 48px;
+        justify-content: center;
+      }
+      .pvp-mode-btn {
+        min-height: 44px;
+        font-size: 13px;
+      }
+      .pvp-subcard {
+        padding: 14px;
+      }
+      .pvp-member-list li {
+        padding: 10px 12px;
+        font-size: 14px;
+      }
+      .pvp-room-code-row {
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      .pvp-replay-list {
+        gap: 8px;
+      }
     }
   `;
   document.head.appendChild(style);
@@ -659,7 +685,7 @@ function createMatchPlayerRow(player, mode, localUserId) {
 
   const identity = document.createElement('div');
   const name = document.createElement('strong');
-  name.textContent = player.displayName || player.username || player.userId || 'Player';
+  name.textContent = player.username || player.displayName || player.userId || 'Player';
   const subline = document.createElement('small');
   subline.textContent = player.username || player.userId || '-';
   identity.append(name, subline);
@@ -1065,7 +1091,7 @@ function createEventRankingRow(entry, currentUserId) {
   const main = document.createElement('div');
   main.className = 'pvp-rank-main';
   const name = document.createElement('strong');
-  name.textContent = entry.user?.displayName || entry.user?.username || entry.user?.id || '玩家';
+  name.textContent = entry.user?.username || entry.user?.displayName || entry.user?.id || '玩家';
   const subline = document.createElement('small');
   subline.textContent = entry.user?.username || entry.user?.id || '-';
   main.append(name, subline);
@@ -1210,7 +1236,7 @@ function renderReplayCard(elements) {
 
     const detail = document.createElement('small');
     const participants = Array.isArray(item.participants)
-      ? item.participants.map((player) => player.displayName || player.username || player.userId).join(' / ')
+      ? item.participants.map((player) => player.username || player.displayName || player.userId).join(' / ')
       : '-';
     const eventSummary = item.eventSummary?.enabled
       ? `42杯 ${item.eventSummary.counted ? '计入' : '未计入'} · 积分 ${Number(item.eventSummary.scoreDelta || 0)}${item.eventSummary.rankAfterMatch != null ? ` · 排名 #${Number(item.eventSummary.rankAfterMatch)}` : ''}`
@@ -1361,7 +1387,7 @@ function render() {
 
     const identity = document.createElement('div');
     const name = document.createElement('strong');
-    name.textContent = member.displayName || member.username || member.userId || 'Player';
+    name.textContent = member.username || member.displayName || member.userId || 'Player';
     const subline = document.createElement('small');
     subline.textContent = member.username || member.userId || '-';
     identity.append(name, subline);
@@ -1414,7 +1440,7 @@ function render() {
       if (leader) {
         appendMatchLine(
           elements.matchDetails,
-          `当前领跑：${leader.displayName || leader.username || leader.userId} · 命 ${Math.max(0, Number(leader.lives ?? 0))} · K ${Math.max(0, Number(leader.kills ?? 0))}`
+          `当前领跑：${leader.username || leader.displayName || leader.userId} · 命 ${Math.max(0, Number(leader.lives ?? 0))} · K ${Math.max(0, Number(leader.kills ?? 0))}`
         );
       }
     }

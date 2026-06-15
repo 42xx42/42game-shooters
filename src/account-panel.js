@@ -153,12 +153,12 @@ function buildPvpSummaryForSession(detail, session) {
     playerIsMvp: String(playerStat.userId) === String(detail.mvpUserId),
     eligibleForAward: false,
     mvpTeam: mvpStat?.team || detail.winnerTeam || null,
-    mvpName: mvpStat?.displayName || mvpStat?.username || null,
+    mvpName: mvpStat?.username || mvpStat?.displayName || null,
     playerName:
-      session.user?.displayName ||
       session.user?.username ||
-      playerStat.displayName ||
+      session.user?.displayName ||
       playerStat.username ||
+      playerStat.displayName ||
       'Linux.do 用户',
     awardBlockedReason: null,
     matchDurationSeconds: null,
@@ -333,7 +333,7 @@ function renderSignedOut(session) {
 }
 
 function renderSignedIn(session, rewards) {
-  const userName = session.user?.displayName || session.user?.username || 'Linux.do 用户';
+  const userName = session.user?.username || session.user?.displayName || 'Linux.do 用户';
   const pendingAward = rewards?.pendingAward || session.pendingAward || null;
   const pendingLimitStatus = rewards?.pendingLimitStatus || null;
   const claimCount = Number(rewards?.claimCount || 0);

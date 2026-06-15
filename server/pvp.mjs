@@ -155,7 +155,7 @@ function normalizeUser(user) {
   return {
     id: String(source.id || source.userId || ''),
     username: String(source.username || ''),
-    displayName: String(source.displayName || source.username || source.id || 'Player'),
+    displayName: String(source.username || source.displayName || source.id || 'Player'),
     avatarUrl: source.avatarUrl || null
   };
 }

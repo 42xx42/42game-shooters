@@ -762,6 +762,22 @@
       display: none;
     }
 
+    body[data-mobile="true"] .mobileOnlyRow {
+      display: flex;
+    }
+
+    body[data-mobile="true"] .mobileOnlyBlock {
+      display: block;
+    }
+
+    .mobilePauseHint {
+      display: none;
+    }
+
+    body[data-mobile="true"] .mobilePauseHint {
+      display: block;
+    }
+
     #mobileControls {
       position: absolute;
       inset: 0;
@@ -931,7 +947,7 @@
       background: linear-gradient(180deg, rgba(159, 233, 255, 0.92), rgba(88, 200, 239, 0.82));
       border: 1px solid rgba(255, 255, 255, 0.24);
       box-shadow: 0 12px 18px rgba(29, 168, 216, 0.24);
-      transition: transform 0.04s linear;
+      transition: transform 0.08s ease-out;
     }
 
     #mobileMoveHint {
@@ -1029,6 +1045,15 @@
       box-shadow: 0 0 0 #1d4ed8, 0 4px 8px rgba(0, 0, 0, 0.3);
     }
 
+    .mobileBtn.primary[data-armed="true"] {
+      animation: mobileFirePulse 0.18s ease-in-out infinite alternate;
+    }
+
+    @keyframes mobileFirePulse {
+      0% { box-shadow: 0 4px 0 #1d4ed8, 0 8px 16px rgba(0, 0, 0, 0.3), 0 0 12px rgba(59, 130, 246, 0.2); }
+      100% { box-shadow: 0 2px 0 #1d4ed8, 0 4px 10px rgba(0, 0, 0, 0.3), 0 0 24px rgba(59, 130, 246, 0.5); }
+    }
+
     .mobileBtn.compact {
       min-width: 76px;
       min-height: 42px;
@@ -1038,6 +1063,28 @@
 
     .mobileBtn.ghost {
       background: rgba(7, 10, 15, 0.56);
+    }
+
+    .mobileCooldownOverlay {
+      position: absolute;
+      inset: 0;
+      border-radius: 18px;
+      pointer-events: none;
+      background: conic-gradient(
+        rgba(77, 231, 255, 0.35) var(--cd-pct, 0%),
+        transparent var(--cd-pct, 0%)
+      );
+      transition: background 0.1s linear;
+    }
+
+    .mobileBtn {
+      position: relative;
+      overflow: hidden;
+    }
+
+    .mobileBtn .mobileCooldownOverlay + :not(.mobileCooldownOverlay) {
+      position: relative;
+      z-index: 1;
     }
 
     .mobileBtn[data-armed="true"] {
@@ -2090,6 +2137,20 @@
       padding: 12px 16px 10px;
     }
 
+    #hud[data-visual-density="compact"][data-mobile="true"] #mobileMovePad,
+    #hud[data-visual-density="compact"][data-mobile="true"] .mobileBtn {
+      opacity: 0.55;
+    }
+
+    #hud[data-visual-density="compact"][data-mobile="true"] #mobileLookZoneLabel,
+    #hud[data-visual-density="compact"][data-mobile="true"] #mobileMoveHint {
+      opacity: 0.3;
+    }
+
+    #hud[data-visual-density="compact"][data-mobile="true"] #mobileTopHud {
+      opacity: 0.7;
+    }
+
     @media (max-width: 900px) {
       #app {
         padding: 0;
@@ -2146,6 +2207,39 @@
         min-width: 190px;
       }
 
+      /* 小屏横屏菜单优化 */
+      .menuSurface {
+        padding: 16px;
+      }
+
+      .menuStats {
+        gap: 8px;
+        margin: 14px 0 12px;
+      }
+
+      .menuStat {
+        padding: 10px 12px;
+      }
+
+      .mapDeck {
+        gap: 8px;
+      }
+
+      .mapDeck .mapBtn {
+        padding: 8px 10px;
+        font-size: 12px;
+      }
+
+      .difficultyButtons {
+        gap: 6px;
+      }
+
+      .difficultyBtn {
+        min-height: 40px;
+        padding: 0 14px;
+        font-size: 12px;
+      }
+
       #mobileTopHud {
         grid-template-columns: minmax(0, 1fr);
       }
@@ -2181,6 +2275,22 @@
       #mobileWeaponBtn,
       #mobileGrenadeBtn {
         min-width: 118px;
+      }
+
+      /* 结算界面小屏适配 */
+      #matchOverlay .accountCard {
+        width: 100%;
+      }
+
+      #matchOverlay .accountActions {
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      #matchOverlay .accountActions .accountBtn {
+        flex: 1 1 auto;
+        min-width: 0;
+        justify-content: center;
       }
 
       #mobileLookZone {
@@ -2324,13 +2434,13 @@
           <div id="mobileActionDock">
             <div id="mobileTacticalDrawer" data-expanded="false">
               <button class="mobileBtn" id="mobileWeaponBtn" type="button">切枪</button>
-              <button class="mobileBtn" id="mobileGrenadeBtn" type="button">手雷</button>
+              <button class="mobileBtn" id="mobileGrenadeBtn" type="button"><span class="mobileCooldownOverlay"></span>手雷</button>
             </div>
             <div id="mobileActionRail">
               <button class="mobileBtn compact ghost" id="mobileTacticalBtn" type="button">战术</button>
               <div class="mobileActionRow">
                 <button class="mobileBtn" id="mobileReloadBtn" type="button">换弹</button>
-                <button class="mobileBtn" id="mobileDashBtn" type="button">闪避</button>
+                <button class="mobileBtn" id="mobileDashBtn" type="button"><span class="mobileCooldownOverlay"></span>闪避</button>
               </div>
               <button class="mobileBtn primary" id="mobileFireBtn" type="button">开火</button>
             </div>
@@ -2440,6 +2550,7 @@
         <div id="pauseOverlay" class="overlay">
           <h1>已暂停</h1>
           <div class="subtitle">按 面板 P键 / Esc键 恢复游戏</div>
+          <div class="subtitle mobilePauseHint" style="margin-top: -6px;">触屏用户点下方「继续游戏」按钮恢复</div>
           <div class="accountActions mobileOnlyRow">
             <button class="accountBtn" id="touchPauseResumeBtn" type="button">继续游戏</button>
           </div>
@@ -2622,7 +2733,7 @@
           pitchMin: -1.15,
           pitchMax: 1.15,
           sensitivity: 0.0048,
-          touchSensitivityMultiplier: 1.2,
+          touchSensitivityMultiplier: 1.5,
           maxMouseDelta: 960,
           maxTouchDelta: 72,
           maxYawStep: 2.85,
@@ -2984,7 +3095,9 @@
       moveX: 0,
       moveY: 0,
       lookLastX: 0,
-      lookLastY: 0
+      lookLastY: 0,
+      lookInertiaX: 0,
+      lookInertiaY: 0
     };
 
     const hudPanels = new Map();
@@ -3732,6 +3845,7 @@
     function updateMobileMode() {
       mobileState.active = shouldUseMobileControls();
       mobileState.orientationBlocked = shouldBlockMobilePortrait();
+      document.body.dataset.mobile = mobileState.active ? 'true' : 'false';
       syncMobileHudState();
       if (mobileState.active && !mobileState.orientationBlocked && isAnyPlayingMode() && state.viewMode !== 'fps') {
         setViewMode('fps', { skipPointerLock: true });
@@ -3771,6 +3885,8 @@
       mobileState.lookPointerId = null;
       mobileState.lookLastX = 0;
       mobileState.lookLastY = 0;
+      mobileState.lookInertiaX = 0;
+      mobileState.lookInertiaY = 0;
     }
 
     function setMobileFire(active) {
@@ -3778,8 +3894,10 @@
       if (active) {
         input.mouse.justPressed = true;
         mobileFireBtn?.setAttribute('data-armed', 'true');
+        navigator.vibrate?.(30);
       } else {
         mobileFireBtn?.removeAttribute('data-armed');
+        navigator.vibrate?.(10);
       }
     }
 
@@ -3945,10 +4063,28 @@
         dx *= scale;
         dy *= scale;
       }
-      mobileState.moveX = dx / radius;
-      mobileState.moveY = -dy / radius;
+      // 中心死区：距离小于半径 12% 时回零，防止漂移
+      const DEAD_ZONE_RATIO = 0.12;
+      const deadZonePx = radius * DEAD_ZONE_RATIO;
+      if (dist < deadZonePx) {
+        mobileState.moveX = 0;
+        mobileState.moveY = 0;
+        if (mobileMoveThumbEl) {
+          mobileMoveThumbEl.style.transform = 'translate(0px, 0px)';
+        }
+        return;
+      }
+      // 把死区外的范围重新映射到 0-1 区间
+      const effectiveDist = dist - deadZonePx;
+      const effectiveRadius = radius - deadZonePx;
+      const clampedDist = Math.min(effectiveDist, effectiveRadius);
+      const ratio = clampedDist / effectiveRadius;
+      const outX = (dx / dist) * ratio;
+      const outY = (dy / dist) * ratio;
+      mobileState.moveX = outX;
+      mobileState.moveY = -outY;
       if (mobileMoveThumbEl) {
-        mobileMoveThumbEl.style.transform = `translate(${dx.toFixed(1)}px, ${dy.toFixed(1)}px)`;
+        mobileMoveThumbEl.style.transform = `translate(${outX.toFixed(1)}px, ${outY.toFixed(1)}px)`;
       }
     }
 
@@ -3981,6 +4117,8 @@
       }
       const dx = event.clientX - mobileState.lookLastX;
       const dy = event.clientY - mobileState.lookLastY;
+      mobileState.lookInertiaX = dx;
+      mobileState.lookInertiaY = dy;
       applyFpsLookInput(dx, dy, 'touch');
       mobileState.lookLastX = event.clientX;
       mobileState.lookLastY = event.clientY;
@@ -5522,7 +5660,7 @@
 
       const identity = document.createElement('div');
       const title = document.createElement('strong');
-      title.textContent = player?.displayName || player?.username || player?.userId || 'Player';
+      title.textContent = player?.username || player?.displayName || player?.userId || 'Player';
       const subline = document.createElement('small');
       subline.textContent = player?.username || player?.userId || '-';
       identity.append(title, subline);
@@ -5802,7 +5940,7 @@
         spawn: new THREE.Vector3(playerSnapshot.x || 0, 0, playerSnapshot.z || 0)
       });
       entity.userId = playerSnapshot.userId;
-      entity.displayName = playerSnapshot.displayName || playerSnapshot.username || playerSnapshot.userId || `Player ${index + 1}`;
+      entity.displayName = playerSnapshot.username || playerSnapshot.displayName || playerSnapshot.userId || `Player ${index + 1}`;
       entity.isPlayer = playerSnapshot.team === localTeam;
       entity.isAI = false;
       configureEntityFromLiveSnapshot(entity, playerSnapshot);
@@ -6106,12 +6244,12 @@
           : '服务器中断或房间异常关闭，本局不会自动发码。';
       } else {
         const winner = result?.stats?.find((entry) => entry.won) || null;
-        const winnerName = winner?.displayName || winner?.username || result?.winnerTeam || '未知玩家';
+        const winnerName = winner?.username || winner?.displayName || result?.winnerTeam || '未知玩家';
         const mvp = result?.stats?.find((entry) => String(entry.userId) === String(result?.mvpUserId)) || null;
         matchTitle.textContent = wasSpectating ? '观赛结束' : `${winnerName} 获胜`;
         matchStats.textContent = wasSpectating
-          ? `本场胜者: ${winnerName} · MVP: ${mvp?.displayName || mvp?.username || '无'}`
-          : `在线 PVP 已结束 · MVP: ${mvp?.displayName || mvp?.username || '无'} · 不触发自动发码`;
+          ? `本场胜者: ${winnerName} · MVP: ${mvp?.username || mvp?.displayName || '无'}`
+          : `在线 PVP 已结束 · MVP: ${mvp?.username || mvp?.displayName || '无'} · 不触发自动发码`;
       }
       bestTimeEnd.textContent = wasSpectating
         ? '当前只是观赛，不触发任何奖励。'
@@ -9508,8 +9646,8 @@
         playerIsMvp,
         eligibleForAward: Boolean(playerWon && playerIsMvp),
         mvpTeam: mvp?.team || null,
-        mvpName: mvp?.displayName || mvp?.id || null,
-        playerName: player?.displayName || player?.id || null,
+        mvpName: mvp?.username || mvp?.displayName || mvp?.id || null,
+        playerName: player?.username || player?.displayName || player?.id || null,
         matchDurationSeconds: Math.max(0, Math.round((elapsedSeconds || 0) * 100) / 100),
         playerStats: player
           ? {
@@ -9700,6 +9838,13 @@
       if (mobileDashBtn) {
         mobileDashBtn.disabled = !isPlaying || !player || dashCooldown > 0;
         mobileDashBtn.textContent = dashCooldown > 0.05 ? `闪避 ${dashCooldown.toFixed(1)}s` : '闪避';
+        const dashOverlay = mobileDashBtn.querySelector('.mobileCooldownOverlay');
+        if (dashOverlay && dashCooldown > 0) {
+          const pct = Math.min(100, (dashCooldown / (player?.dashCooldown || CONFIG.movement.dashCooldown)) * 100);
+          dashOverlay.style.setProperty('--cd-pct', `${100 - pct}%`);
+        } else if (dashOverlay) {
+          dashOverlay.style.setProperty('--cd-pct', '0%');
+        }
       }
 
       if (mobileWeaponBtn) {
@@ -9723,6 +9868,14 @@
           mobileGrenadeBtn.textContent = grenadeCooldown > 0.05
             ? `手雷 ${grenadeCooldown.toFixed(1)}s`
             : `手雷 ${grenadeAmmo}`;
+        }
+        const grenadeOverlay = mobileGrenadeBtn.querySelector('.mobileCooldownOverlay');
+        if (grenadeOverlay && grenadeCooldown > 0) {
+          const maxCd = CONFIG?.grenade?.cooldown || 3.2;
+          const pct = Math.min(100, (grenadeCooldown / maxCd) * 100);
+          grenadeOverlay.style.setProperty('--cd-pct', `${100 - pct}%`);
+        } else if (grenadeOverlay) {
+          grenadeOverlay.style.setProperty('--cd-pct', '0%');
         }
       }
 
@@ -10083,6 +10236,19 @@
       if (state.viewMode === 'fps') {
         const player = getPlayer();
         if (!player) return;
+
+        // 移动端视野惯性衰减
+        if (mobileState.active && !mobileState.orientationBlocked) {
+          const INERTIA_DECAY = 0.82;
+          const INERTIA_THRESHOLD = 0.3;
+          if (Math.abs(mobileState.lookInertiaX) > INERTIA_THRESHOLD || Math.abs(mobileState.lookInertiaY) > INERTIA_THRESHOLD) {
+            applyFpsLookInput(mobileState.lookInertiaX, mobileState.lookInertiaY, 'touch');
+          }
+          mobileState.lookInertiaX *= INERTIA_DECAY;
+          mobileState.lookInertiaY *= INERTIA_DECAY;
+          if (Math.abs(mobileState.lookInertiaX) < INERTIA_THRESHOLD) mobileState.lookInertiaX = 0;
+          if (Math.abs(mobileState.lookInertiaY) < INERTIA_THRESHOLD) mobileState.lookInertiaY = 0;
+        }
 
         const eyeHeight = CONFIG.camera.fps.eyeHeight;
         const yaw = player.yaw;

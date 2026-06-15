@@ -89,6 +89,17 @@ test('Linux.do login flow can dispatch CDKs from separate PVE and PVP pools', as
   assert.ok(cookie);
   const sessionCookie = cookie.split(';', 1)[0];
 
+  const sessionResponse = await fetch(`${baseUrl}/api/auth/session`, {
+    headers: {
+      Cookie: sessionCookie
+    }
+  });
+
+  assert.equal(sessionResponse.status, 200);
+  const sessionPayload = await sessionResponse.json();
+  assert.equal(sessionPayload.user.username, 'alice');
+  assert.equal(sessionPayload.user.displayName, 'alice');
+
   const initialRewardPolicyResponse = await fetch(`${baseUrl}/api/admin/reward-policy`, {
     headers: {
       Cookie: sessionCookie
