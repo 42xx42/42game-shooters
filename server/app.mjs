@@ -2802,7 +2802,18 @@ export function createApp(options = {}) {
     });
     await ensureJsonFile(redeemCodesFile, {
       version: 1,
-      codes: []
+      codes: [
+        {
+          code: '42thirdShortcakeAtLinuxdo',
+          creditAmountQuota: 2100000,
+          note: '4.2 LDC',
+          status: 'active',
+          maxClaimsPerUser: 1,
+          createdAt: null,
+          createdBy: null,
+          claims: []
+        }
+      ]
     });
   }
 
