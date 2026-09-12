@@ -68,7 +68,7 @@ export function createAdminReplayViewer({ apiRequest, formatDate }) {
 
   function getPlayerName(playerMap, userId) {
     const player = playerMap.get(String(userId || ''));
-    return player?.displayName || player?.username || String(userId || '-');
+    return player?.username || player?.displayName || String(userId || '-');
   }
 
   function getReplayMapId() {
@@ -213,7 +213,7 @@ export function createAdminReplayViewer({ apiRequest, formatDate }) {
       <div class="replay-card"><strong>比赛</strong><span>${escapeHtml([state.detail?.match?.winnerTeam ? `胜者 ${state.detail.match.winnerTeam}` : null, state.detail?.match?.completedAt ? formatDate(state.detail.match.completedAt) : null].filter(Boolean).join(' | ') || '暂无')}</span></div>
       <div class="replay-card"><strong>统计</strong><span>${escapeHtml(state.content?.summary ? `${Number(state.content.summary.snapshotCount || 0)} 帧 / ${Number(state.content.summary.eventCount || 0)} 事件` : '摘要模式')}</span></div>
     `;
-    state.ui.filter.innerHTML = ['<option value="">全部玩家</option>', ...players.map((player) => `<option value="${escapeHtml(player.userId)}">${escapeHtml(player.displayName || player.username || player.userId)}</option>`)].join('');
+    state.ui.filter.innerHTML = ['<option value="">全部玩家</option>', ...players.map((player) => `<option value="${escapeHtml(player.userId)}">${escapeHtml(player.username || player.displayName || player.userId)}</option>`)].join('');
     if (!players.some((player) => String(player.userId || '') === String(state.selectedUserId))) {
       state.selectedUserId = '';
     }

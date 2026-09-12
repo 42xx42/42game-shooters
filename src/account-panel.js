@@ -17,6 +17,8 @@ const elements = {
   codeLabel: document.getElementById('accountCodeLabel'),
   codeValue: document.getElementById('accountCodeValue'),
   copyButton: document.getElementById('accountCopyBtn'),
+  historyPanel: document.getElementById('accountRewardHistory'),
+  historyList: document.getElementById('accountRewardHistoryList'),
   feedback: document.getElementById('accountFeedback'),
   matchPanel: document.getElementById('matchAwardPanel'),
   matchTitle: document.getElementById('matchAwardTitle'),
@@ -25,7 +27,10 @@ const elements = {
   matchCodeCard: document.getElementById('matchAwardCodeCard'),
   matchCodeValue: document.getElementById('matchAwardCodeValue'),
   matchCopyButton: document.getElementById('matchAwardCopyBtn'),
-  matchFeedback: document.getElementById('matchAwardFeedback')
+  matchFeedback: document.getElementById('matchAwardFeedback'),
+  redeemCard: document.getElementById('accountRedeemCard'),
+  redeemInput: document.getElementById('accountRedeemInput'),
+  redeemButton: document.getElementById('accountRedeemBtn')
 };
 
 const model = {
@@ -153,12 +158,12 @@ function buildPvpSummaryForSession(detail, session) {
     playerIsMvp: String(playerStat.userId) === String(detail.mvpUserId),
     eligibleForAward: false,
     mvpTeam: mvpStat?.team || detail.winnerTeam || null,
-    mvpName: mvpStat?.displayName || mvpStat?.username || null,
+    mvpName: mvpStat?.username || mvpStat?.displayName || null,
     playerName:
-      session.user?.displayName ||
       session.user?.username ||
-      playerStat.displayName ||
+      session.user?.displayName ||
       playerStat.username ||
+      playerStat.displayName ||
       'Linux.do 用户',
     awardBlockedReason: null,
     matchDurationSeconds: null,
@@ -187,6 +192,30 @@ function buildPvpSummaryForSession(detail, session) {
 
 function getRewardPolicy(session, rewards) {
   return rewards?.rewardPolicy || session?.rewardPolicy || null;
+}
+
+function getActiveRewardBackend(session, rewards) {
+  const backend =
+    rewards?.rewardBackend ||
+    rewards?.rewardDelivery?.backend ||
+    session?.rewardDelivery?.backend ||
+    'newapi';
+
+  return String(backend).trim().toLowerCase() === 'cdk' ? 'cdk' : 'newapi';
+}
+
+function isNewApiRewardBackend(session, rewards) {
+  return getActiveRewardBackend(session, rewards) === 'newapi';
+}
+
+function getLatestClaimDisplayValue(latestClaim) {
+  if (latestClaim?.code) {
+    return latestClaim.code;
+  }
+  if (latestClaim?.creditAmountLabel) {
+    return latestClaim.creditAmountLabel;
+  }
+  return '-';
 }
 
 function formatRewardPolicySummary(policy) {
@@ -292,24 +321,107 @@ function setLoadingState(isLoading) {
 }
 
 function renderLatestClaim(latestClaim) {
+  const hasClaim = Boolean(latestClaim?.code || latestClaim?.creditAmountLabel);
   const hasCode = Boolean(latestClaim?.code);
   const poolLabel = getPoolLabel(latestClaim?.claimContext?.summary?.codePool || latestClaim?.pool);
 
-  elements.codeCard.hidden = !hasCode;
+  elements.codeCard.hidden = !hasClaim;
   elements.copyButton.hidden = !hasCode;
 
   if (elements.codeLabel) {
-    elements.codeLabel.textContent = hasCode ? `最近领取的 ${poolLabel} CDK` : '最近领取的 CDK';
+    elements.codeLabel.textContent = hasCode
+      ? `最近领取的 ${poolLabel} CDK`
+      : latestClaim?.creditAmountLabel
+        ? `最近领取到 42 API 的 ${poolLabel} 余额`
+        : '最近领取的奖励';
   }
 
-  elements.codeValue.textContent = hasCode ? latestClaim.code : '-';
+  elements.codeValue.textContent = hasClaim ? getLatestClaimDisplayValue(latestClaim) : '-';
 }
 
-function renderMatchCode(code) {
-  const hasCode = Boolean(code);
-  elements.matchCodeCard.hidden = !hasCode;
-  elements.matchCopyButton.hidden = !hasCode;
-  elements.matchCodeValue.textContent = hasCode ? code : '-';
+function formatRewardHistoryTime(value) {
+  if (!value) return '';
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return '';
+  }
+
+  return new Intl.DateTimeFormat('zh-CN', {
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit'
+  }).format(date);
+}
+
+function getDeliveryStatusLabel(status) {
+  if (status === 'delivered') return '已到账';
+  if (status === 'awaiting_newapi_account') return '待 42 API 登录';
+  if (status === 'delivery_failed') return '发放失败';
+  if (status === 'delivery_unavailable') return '暂不可用';
+  if (status === 'ready') return '待领取';
+  return '已记录';
+}
+
+function renderRewardHistory(rewards) {
+  if (!elements.historyPanel || !elements.historyList) {
+    return;
+  }
+
+  const recentClaims = Array.isArray(rewards?.recentClaims) ? rewards.recentClaims.filter(Boolean) : [];
+  elements.historyPanel.hidden = recentClaims.length <= 0;
+  elements.historyList.replaceChildren();
+
+  if (recentClaims.length <= 0) {
+    return;
+  }
+
+  for (const claim of recentClaims) {
+    const poolLabel = getPoolLabel(claim?.claimContext?.summary?.codePool || claim?.pool);
+    const badgeLabel = claim?.code ? 'CDK' : '42 API';
+    const valueLabel = claim?.code || claim?.creditAmountLabel || '-';
+    const metaParts = [`${poolLabel} ${badgeLabel}`, getDeliveryStatusLabel(claim?.deliveryStatus)];
+    const timeLabel = formatRewardHistoryTime(claim?.creditedAt || claim?.claimedAt);
+    if (timeLabel) {
+      metaParts.push(timeLabel);
+    }
+    if (claim?.topupTradeNo) {
+      metaParts.push(`单号 ${claim.topupTradeNo}`);
+    }
+
+    const item = document.createElement('li');
+    item.className = 'accountHistoryItem';
+
+    const topRow = document.createElement('div');
+    topRow.className = 'accountHistoryTop';
+
+    const value = document.createElement('strong');
+    value.className = 'accountHistoryValue';
+    value.textContent = valueLabel;
+
+    const badge = document.createElement('span');
+    badge.className = 'accountHistoryBadge';
+    badge.textContent = badgeLabel;
+
+    topRow.append(value, badge);
+
+    const meta = document.createElement('div');
+    meta.className = 'accountHistoryMeta';
+    meta.textContent = metaParts.join(' · ');
+
+    item.append(topRow, meta);
+    elements.historyList.append(item);
+  }
+}
+
+function renderMatchCode(value, options = {}) {
+  const hasValue = Boolean(value);
+  const copyable = Boolean(options.copyable);
+
+  elements.matchCodeCard.hidden = !hasValue;
+  elements.matchCopyButton.hidden = !(hasValue && copyable);
+  elements.matchCodeValue.textContent = hasValue ? value : '-';
 }
 
 function renderSignedOut(session) {
@@ -320,8 +432,10 @@ function renderSignedOut(session) {
   elements.title.textContent = 'Linux.do 登录';
   elements.meta.textContent = oauthConfigured
     ? hardenedAwards
-      ? '请在开局前先登录。当前已暂停基于客户端战绩的自动发码，需等待服务端验证能力上线。'
-      : `请在开局前先登录。${formatRewardPolicySummary(rewardPolicy)}`
+      ? '请在开局前先登录。当前已暂停基于客户端战绩的自动奖励发放，需等待服务端验证能力上线。'
+      : isNewApiRewardBackend(session, null)
+        ? `请在开局前先登录。符合条件的 MVP 奖励会在你手动领取后直接发到 42 API。${formatRewardPolicySummary(rewardPolicy)}`
+        : `请在开局前先登录。${formatRewardPolicySummary(rewardPolicy)}`
     : 'OAuth 尚未配置，请先设置 LINUX_DO_CLIENT_ID 和 LINUX_DO_CLIENT_SECRET。';
   elements.loginButton.hidden = false;
   elements.loginButton.href = `/auth/linuxdo/start?returnTo=${getReturnTo()}`;
@@ -329,17 +443,22 @@ function renderSignedOut(session) {
   elements.claimButton.hidden = true;
   elements.logoutButton.hidden = true;
   elements.adminLink.hidden = true;
+  if (elements.redeemCard) elements.redeemCard.hidden = true;
   renderLatestClaim(null);
+  renderRewardHistory(null);
 }
 
 function renderSignedIn(session, rewards) {
-  const userName = session.user?.displayName || session.user?.username || 'Linux.do 用户';
+  const userName = session.user?.username || session.user?.displayName || 'Linux.do 用户';
   const pendingAward = rewards?.pendingAward || session.pendingAward || null;
   const pendingLimitStatus = rewards?.pendingLimitStatus || null;
   const claimCount = Number(rewards?.claimCount || 0);
   const claimCounts = rewards?.claimCounts || { pve: 0, pvp: 0 };
   const hardenedAwards = requiresServerVerification(session);
   const rewardPolicy = getRewardPolicy(session, rewards);
+  const rewardBackend = getActiveRewardBackend(session, rewards);
+  const pendingCreditAmountLabel = rewards?.creditAmountLabel || null;
+  const pendingDeliveryStatus = rewards?.deliveryStatus || 'ready';
 
   if (pendingAward) {
     const codePool = rewards?.pendingCodePool || getSummaryCodePool(pendingAward.summary);
@@ -348,31 +467,46 @@ function renderSignedIn(session, rewards) {
     const remainingClaims = Number(pendingLimitStatus?.remaining ?? 0);
 
     elements.title.textContent = `${userName} 的 ${poolLabel} 奖励已就绪`;
-    elements.meta.textContent =
-      availableCount <= 0
+    elements.meta.textContent = rewardBackend === 'newapi'
+      ? pendingDeliveryStatus === 'awaiting_newapi_account'
+        ? `这局已经为你锁定 ${pendingCreditAmountLabel || '42 API 余额'}，但 42 API 还没有找到同一个 Linux.do 账号。请先去 42 API 登录一次，再回来领取。`
+        : pendingDeliveryStatus === 'delivery_failed' || pendingDeliveryStatus === 'delivery_unavailable'
+          ? `这局已经为你锁定 ${pendingCreditAmountLabel || '42 API 余额'}，但上次发放没有完成。奖励仍然保留，稍后可以继续重试。`
+        : remainingClaims <= 0
+          ? `这局已经满足 ${getRewardPoolDescription(codePool)} 的领奖条件，奖励会发到 42 API，但你今天的领取额度已经用完。${formatLimitStatus(pendingLimitStatus)}`
+          : `这局已经满足 ${getRewardPoolDescription(codePool)} 的领奖条件，点击后会把 ${pendingCreditAmountLabel || '余额'} 直接发到 42 API。${formatLimitStatus(pendingLimitStatus)}`
+      : availableCount <= 0
         ? `这局已经满足 ${getRewardPoolDescription(codePool)} 的发码条件，但当前该奖励暂时无可领取兑换码。`
         : remainingClaims <= 0
           ? `这局已经满足 ${getRewardPoolDescription(codePool)} 的发码条件，但你今天的领取额度已经用完。${formatLimitStatus(pendingLimitStatus)}`
           : `这局已经满足 ${getRewardPoolDescription(codePool)} 的发码条件，当前该奖励还剩 ${availableCount} 个可领取兑换码。${formatLimitStatus(pendingLimitStatus)}`;
 
-    elements.claimButton.textContent = `领取 ${poolLabel} CDK`;
+    elements.claimButton.textContent = rewardBackend === 'newapi'
+      ? `领取 ${pendingCreditAmountLabel || `${poolLabel} 余额`}`
+      : `领取 ${poolLabel} CDK`;
     elements.claimButton.hidden = false;
-    elements.claimButton.disabled = availableCount <= 0 || remainingClaims <= 0;
+    elements.claimButton.disabled =
+      (rewardBackend === 'cdk' && availableCount <= 0) || remainingClaims <= 0;
   } else {
     elements.title.textContent = `当前已登录：${userName}`;
     elements.meta.textContent =
       hardenedAwards
-        ? `当前已暂停基于客户端战绩的自动发码，需等待服务端验证能力上线。` +
-          ` 你当前累计已领取 ${claimCount} 个兑换码（PVE ${Number(claimCounts.pve || 0)} / PVP ${Number(claimCounts.pvp || 0)}）。`
-        : `${formatRewardPolicySummary(rewardPolicy)}` +
-          ` 你当前累计已领取 ${claimCount} 个兑换码（PVE ${Number(claimCounts.pve || 0)} / PVP ${Number(claimCounts.pvp || 0)}）。`;
+        ? `当前已暂停基于客户端战绩的自动奖励发放，需等待服务端验证能力上线。` +
+          ` 你当前累计已领取 ${claimCount} 次奖励（PVE ${Number(claimCounts.pve || 0)} / PVP ${Number(claimCounts.pvp || 0)}）。`
+        : rewardBackend === 'newapi'
+          ? `${formatRewardPolicySummary(rewardPolicy)}` +
+            ` 你当前累计已领取 ${claimCount} 次奖励（PVE ${Number(claimCounts.pve || 0)} / PVP ${Number(claimCounts.pvp || 0)}），会直接发到 42 API。`
+          : `${formatRewardPolicySummary(rewardPolicy)}` +
+            ` 你当前累计已领取 ${claimCount} 个兑换码（PVE ${Number(claimCounts.pve || 0)} / PVP ${Number(claimCounts.pvp || 0)}）。`;
     elements.claimButton.hidden = true;
   }
 
   elements.loginButton.hidden = true;
   elements.logoutButton.hidden = false;
   elements.adminLink.hidden = !session.isAdmin;
+  if (elements.redeemCard) elements.redeemCard.hidden = false;
   renderLatestClaim(rewards?.latestClaim || null);
+  renderRewardHistory(rewards || null);
 }
 
 function renderMatchOutcomePanel() {
@@ -383,6 +517,9 @@ function renderMatchOutcomePanel() {
   const pendingLimitStatus = rewards?.pendingLimitStatus || null;
   const latestClaim = rewards?.latestClaim || null;
   const hardenedAwards = requiresServerVerification(session);
+  const rewardBackend = getActiveRewardBackend(session, rewards);
+  const pendingCreditAmountLabel = rewards?.creditAmountLabel || null;
+  const pendingDeliveryStatus = rewards?.deliveryStatus || 'ready';
 
   if (!elements.matchPanel) return;
 
@@ -402,15 +539,25 @@ function renderMatchOutcomePanel() {
     const remainingClaims = Number(pendingLimitStatus?.remaining ?? 0);
 
     elements.matchTitle.textContent = `本局 ${poolLabel} 奖励已准备好`;
-    elements.matchMeta.textContent =
-      availableCount <= 0
+    elements.matchMeta.textContent = rewardBackend === 'newapi'
+      ? pendingDeliveryStatus === 'awaiting_newapi_account'
+        ? `本局胜方 MVP：${pendingAward.summary?.mvpName || '未知'}。这笔 ${pendingCreditAmountLabel || '42 API 余额'} 已为你保留，但 42 API 还没有找到同一个 Linux.do 账号。先去登录一次 42 API，再回来领取。`
+        : pendingDeliveryStatus === 'delivery_failed' || pendingDeliveryStatus === 'delivery_unavailable'
+          ? `本局胜方 MVP：${pendingAward.summary?.mvpName || '未知'}。这笔 ${pendingCreditAmountLabel || '42 API 余额'} 上次发放没有完成，但奖励仍然保留，稍后可以继续重试。`
+        : remainingClaims <= 0
+          ? `本局胜方 MVP：${pendingAward.summary?.mvpName || '未知'}。奖励已为你保留，但你今天的额度已用完。${formatLimitStatus(pendingLimitStatus)}`
+          : `本局胜方 MVP：${pendingAward.summary?.mvpName || '未知'}。点击即可把 ${pendingCreditAmountLabel || '余额'} 直接发到 42 API。${formatLimitStatus(pendingLimitStatus)}`
+      : availableCount <= 0
         ? `本局胜方 MVP：${pendingAward.summary?.mvpName || '未知'}。当前 ${poolLabel} 码池为空，请等管理员补码。`
         : remainingClaims <= 0
           ? `本局胜方 MVP：${pendingAward.summary?.mvpName || '未知'}。奖励已为你保留，但你今天的额度已用完。${formatLimitStatus(pendingLimitStatus)}`
           : `本局胜方 MVP：${pendingAward.summary?.mvpName || '未知'}。当前可领取 1 个 ${poolLabel} CDK，${poolLabel} 码池剩余 ${availableCount} 个。${formatLimitStatus(pendingLimitStatus)}`;
-    elements.matchClaimButton.textContent = `领取 ${poolLabel} CDK`;
+    elements.matchClaimButton.textContent = rewardBackend === 'newapi'
+      ? `领取 ${pendingCreditAmountLabel || `${poolLabel} 余额`}`
+      : `领取 ${poolLabel} CDK`;
     elements.matchClaimButton.hidden = false;
-    elements.matchClaimButton.disabled = availableCount <= 0 || remainingClaims <= 0;
+    elements.matchClaimButton.disabled =
+      (rewardBackend === 'cdk' && availableCount <= 0) || remainingClaims <= 0;
     return;
   }
 
@@ -419,14 +566,20 @@ function renderMatchOutcomePanel() {
   if (!summary) {
     elements.matchTitle.textContent = latestClaim?.code
       ? '你最近领取的 CDK 已显示在下方'
+      : latestClaim?.creditAmountLabel
+        ? '你最近领取到 42 API 的奖励已显示在下方'
       : hardenedAwards
-        ? '当前已暂停自动发码'
+        ? '当前已暂停自动奖励发放'
         : '当前没有可领取的 MVP 奖励';
     elements.matchMeta.textContent = latestClaim?.code
       ? '你仍然可以在账号卡片里复制最近一次领取到的兑换码。'
+      : latestClaim?.creditAmountLabel
+        ? '奖励已经发到 42 API；你可以在账号卡片里查看最近一次到账额度。'
       : hardenedAwards
-        ? '当前环境要求服务端验证战斗结果；在验证能力上线前，不会根据客户端上报战绩自动派发 CDK。'
-        : '开始一局比赛，获胜并拿到 MVP 后，就会按对局类型从对应奖池发出 1 个 CDK。';
+        ? '当前环境要求服务端验证战斗结果；在验证能力上线前，不会根据客户端上报战绩自动派奖。'
+        : rewardBackend === 'newapi'
+          ? '开始一局比赛，获胜并拿到 MVP 后，就可以把本局奖励直接领取到 42 API。'
+          : '开始一局比赛，获胜并拿到 MVP 后，就会按对局类型从对应奖池发出 1 个 CDK。';
     return;
   }
 
@@ -435,7 +588,9 @@ function renderMatchOutcomePanel() {
   const poolLabel = getCodePoolLabel(codePool);
 
   if (summary.awardBlockedReason) {
-    elements.matchTitle.textContent = `这局不符合 ${poolLabel} 发码条件`;
+    elements.matchTitle.textContent = rewardBackend === 'newapi'
+      ? `这局不符合 ${poolLabel} 余额发放条件`
+      : `这局不符合 ${poolLabel} 发码条件`;
     elements.matchMeta.textContent = getAwardBlockedMessage(summary.awardBlockedReason, codePool);
     return;
   }
@@ -443,19 +598,25 @@ function renderMatchOutcomePanel() {
   if (!summary.playerWon) {
     elements.matchTitle.textContent = '这局没有获得领奖资格';
     elements.matchMeta.textContent =
-      `本局胜方 MVP：${summary.mvpName || '未知'}。只有胜方 MVP 才能领取 ${poolLabel} CDK。`;
+      rewardBackend === 'newapi'
+        ? `本局胜方 MVP：${summary.mvpName || '未知'}。只有胜方 MVP 才能把奖励领取到 42 API。`
+        : `本局胜方 MVP：${summary.mvpName || '未知'}。只有胜方 MVP 才能领取 ${poolLabel} CDK。`;
     return;
   }
 
   if (!summary.playerIsMvp) {
     elements.matchTitle.textContent = '这局赢了，但你不是 MVP';
     elements.matchMeta.textContent =
-      `本局胜方 MVP：${summary.mvpName || '未知'}。只有胜方 MVP 才能领取 ${poolLabel} CDK。`;
+      rewardBackend === 'newapi'
+        ? `本局胜方 MVP：${summary.mvpName || '未知'}。只有胜方 MVP 才能把奖励领取到 42 API。`
+        : `本局胜方 MVP：${summary.mvpName || '未知'}。只有胜方 MVP 才能领取 ${poolLabel} CDK。`;
     return;
   }
 
   if (!session?.authenticated) {
-    elements.matchTitle.textContent = `你拿到了 MVP，但本局未登录，无法领取 ${poolLabel} CDK`;
+    elements.matchTitle.textContent = rewardBackend === 'newapi'
+      ? `你拿到了 MVP，但本局未登录，无法领取 ${poolLabel} 余额`
+      : `你拿到了 MVP，但本局未登录，无法领取 ${poolLabel} CDK`;
     elements.matchMeta.textContent = '请在下一局开始前先登录，这样服务端才能为该局建立领奖记录。';
     return;
   }
@@ -463,20 +624,26 @@ function renderMatchOutcomePanel() {
   if (rewardPool === 'pvp') {
     elements.matchTitle.textContent = `本局 ${poolLabel} 奖励结算中`;
     elements.matchMeta.textContent = session.pvpConfig?.rewardEnabled
-      ? `如果你是胜方 MVP，服务端会直接准备 ${poolLabel} 奖励；如未立即显示，稍后刷新账号面板即可。`
-      : `当前 ${poolLabel} 奖励开关仍然关闭，因此即使你是胜方 MVP，本局也不会自动派发 ${poolLabel} CDK。`;
+      ? rewardBackend === 'newapi'
+        ? `如果你是胜方 MVP，服务端会直接准备可领取到 42 API 的 ${poolLabel} 奖励；如未立即显示，稍后刷新账号面板即可。`
+        : `如果你是胜方 MVP，服务端会直接准备 ${poolLabel} 奖励；如未立即显示，稍后刷新账号面板即可。`
+      : `当前 ${poolLabel} 奖励开关仍然关闭，因此即使你是胜方 MVP，本局也不会自动派奖。`;
     return;
   }
 
   if (!model.currentMatchTicket?.ticketId) {
     elements.matchTitle.textContent = `你拿到了 MVP，但本局 ${poolLabel} 奖励票据缺失`;
-    elements.matchMeta.textContent = '请在开局前先登录，CDK 派发依赖每局开始时生成的票据。';
+    elements.matchMeta.textContent = rewardBackend === 'newapi'
+      ? '请在开局前先登录，42 API 余额领取依赖每局开始时生成的票据。'
+      : '请在开局前先登录，CDK 派发依赖每局开始时生成的票据。';
     return;
   }
 
   elements.matchTitle.textContent = `正在准备本局 ${poolLabel} 奖励...`;
   elements.matchMeta.textContent =
-    `本局胜方 MVP：${summary.mvpName || '未知'}。服务端正在为这局准备 1 个 ${poolLabel} CDK。`;
+    rewardBackend === 'newapi'
+      ? `本局胜方 MVP：${summary.mvpName || '未知'}。服务端正在为这局准备可领取到 42 API 的 ${poolLabel} 奖励。`
+      : `本局胜方 MVP：${summary.mvpName || '未知'}。服务端正在为这局准备 1 个 ${poolLabel} CDK。`;
 }
 
 async function refreshPanel() {
@@ -500,13 +667,14 @@ async function refreshPanel() {
       return;
     }
 
-    const rewards = await apiRequest('/api/cdks/me');
+    const rewards = await apiRequest('/api/rewards/me');
     model.rewards = rewards;
     renderSignedIn(session, rewards);
     renderMatchOutcomePanel();
     setFeedback('');
   } catch (error) {
     renderLatestClaim(null);
+    renderRewardHistory(null);
     elements.loginButton.hidden = false;
     elements.claimButton.hidden = true;
     elements.logoutButton.hidden = true;
@@ -542,30 +710,53 @@ async function claimCode() {
   setMatchFeedback('正在领取本局奖励...');
 
   try {
-    const result = await apiRequest('/api/cdks/claim', {
+    const result = await apiRequest('/api/rewards/claim', {
       method: 'POST'
     });
 
+    const assignedReward = result.assignedReward || result.assignedCdk || result.latestClaim || null;
     const poolLabel = getPoolLabel(
-      result.assignedCdk?.claimContext?.summary?.codePool || result.codePool || result.assignedCdk?.pool || result.rewardPool
+      assignedReward?.claimContext?.summary?.codePool || result.codePool || assignedReward?.pool || result.rewardPool
     );
-    model.rewards = await apiRequest('/api/cdks/me');
-    renderLatestClaim(result.assignedCdk);
+    const rewardBackend = String(result.rewardBackend || '').trim().toLowerCase() === 'cdk' ? 'cdk' : 'newapi';
+    model.rewards = await apiRequest('/api/rewards/me');
+    renderLatestClaim(assignedReward);
     renderSignedIn(model.session, model.rewards);
-    renderMatchCode(result.assignedCdk?.code || null);
-    elements.matchTitle.textContent = `本局 ${poolLabel} CDK 已派发`;
-    elements.matchMeta.textContent = result.newlyClaimed
-      ? `${poolLabel} 奖池已成功扣减并发出 1 个兑换码。`
-      : '当前账号已经领过这局奖励了。';
-    setFeedback(result.newlyClaimed ? `${poolLabel} CDK 领取成功。` : '这局奖励已经领过了。', 'ok');
-    setMatchFeedback(result.newlyClaimed ? `${poolLabel} CDK 领取成功。` : '这局奖励已经领过了。', 'ok');
+    if (rewardBackend === 'newapi') {
+      renderMatchCode(assignedReward?.creditAmountLabel || result.creditAmountLabel || null, { copyable: false });
+      elements.matchTitle.textContent = `本局 ${poolLabel} 奖励已发到 42 API`;
+      elements.matchMeta.textContent = result.newlyClaimed
+        ? `${assignedReward?.creditAmountLabel || result.creditAmountLabel || '奖励'} 已成功到账。`
+        : '当前账号已经领过这局奖励了。';
+      setFeedback(
+        result.newlyClaimed
+          ? `${assignedReward?.creditAmountLabel || result.creditAmountLabel || '奖励'} 已发到 42 API。`
+          : '这局奖励已经领过了。',
+        'ok'
+      );
+      setMatchFeedback(
+        result.newlyClaimed
+          ? `${assignedReward?.creditAmountLabel || result.creditAmountLabel || '奖励'} 已发到 42 API。`
+          : '这局奖励已经领过了。',
+        'ok'
+      );
+    } else {
+      renderMatchCode(result.assignedCdk?.code || assignedReward?.code || null, { copyable: true });
+      elements.matchTitle.textContent = `本局 ${poolLabel} CDK 已派发`;
+      elements.matchMeta.textContent = result.newlyClaimed
+        ? `${poolLabel} 奖池已成功扣减并发出 1 个兑换码。`
+        : '当前账号已经领过这局奖励了。';
+      setFeedback(result.newlyClaimed ? `${poolLabel} CDK 领取成功。` : '这局奖励已经领过了。', 'ok');
+      setMatchFeedback(result.newlyClaimed ? `${poolLabel} CDK 领取成功。` : '这局奖励已经领过了。', 'ok');
+    }
     model.latestMatchSummary = null;
   } catch (error) {
     const tone =
       error.message === 'cdk_pool_empty' ||
       error.message === 'daily_limit_reached' ||
       error.message === 'award_not_ready' ||
-      error.message === 'award_not_eligible'
+      error.message === 'award_not_eligible' ||
+      error.message === 'awaiting_newapi_account'
         ? 'warn'
         : 'error';
     const codePool = resolveCodePool(error.payload?.codePool || error.payload?.assignedCdk?.pool || '', '');
@@ -579,18 +770,81 @@ async function claimCode() {
       message = getAwardBlockedMessage('daily_limit_reached', codePool || rewardPool, error.payload?.limitStatus || null);
     } else if (error.message === 'award_not_ready') {
       message = '这局奖励还没有准备好，请稍后再试。';
+    } else if (error.message === 'awaiting_newapi_account') {
+      message = '请先去 42 API 用同一个 Linux.do 账号登录一次，再回来领取这局奖励。';
     } else if (error.message === 'award_not_eligible') {
       message = getAwardBlockedMessage(
         error.payload?.disqualifyReason,
         codePool || rewardPool,
         error.payload?.limitStatus || null
       );
+    } else if (error.message === 'delivery_unavailable') {
+      message = '42 API 发放暂时不可用，请稍后再试。';
+    } else if (error.message === 'delivery_failed') {
+      message = '42 API 发放失败了，这局奖励仍会保留，请稍后重试。';
     }
 
     setFeedback(message, tone);
     setMatchFeedback(message, tone);
   } finally {
     setLoadingState(false);
+  }
+}
+
+async function redeemCode() {
+  if (!elements.redeemInput || !elements.redeemButton) return;
+
+  const code = elements.redeemInput.value.trim();
+  if (!code) {
+    setFeedback('请先输入兑换码。', 'warn');
+    elements.redeemInput.focus();
+    return;
+  }
+
+  elements.redeemButton.disabled = true;
+  setFeedback('正在兑换...');
+
+  try {
+    const result = await apiRequest('/api/redeem', {
+      method: 'POST',
+      body: { code }
+    });
+
+    const label = result.creditAmountLabel || '奖励';
+    if (result.deliveryStatus === 'awaiting_newapi_account') {
+      setFeedback('兑换码已记录，但请先去 42 API 用同一个 Linux.do 账号登录一次，再回来重试。', 'warn');
+    } else if (result.deliveryStatus === 'delivery_failed' || result.deliveryStatus === 'delivery_unavailable') {
+      setFeedback(`兑换码有效，但 ${label} 发放暂时失败，请稍后重试。`, 'warn');
+    } else {
+      setFeedback(`兑换成功！${label} 已发到 42 API。`, 'ok');
+      elements.redeemInput.value = '';
+    }
+  } catch (error) {
+    const tone =
+      error.message === 'already_redeemed' ||
+      error.message === 'redeem_code_disabled' ||
+      error.message === 'awaiting_newapi_account'
+        ? 'warn'
+        : 'error';
+
+    let message = error.message;
+    if (error.message === 'redeem_code_not_found') {
+      message = '兑换码无效，请检查后重试。';
+    } else if (error.message === 'already_redeemed') {
+      message = '你已经兑换过这个码了。';
+    } else if (error.message === 'redeem_code_disabled') {
+      message = '这个兑换码已经失效了。';
+    } else if (error.message === 'awaiting_newapi_account') {
+      message = '请先去 42 API 用同一个 Linux.do 账号登录一次，再来兑换。';
+    } else if (error.message === 'delivery_unavailable' || error.message === 'delivery_failed') {
+      message = '42 API 发放暂时不可用，请稍后再试。';
+    } else if (error.message === 'not_authenticated') {
+      message = '请先登录后再兑换。';
+    }
+
+    setFeedback(message, tone);
+  } finally {
+    elements.redeemButton.disabled = false;
   }
 }
 
@@ -639,6 +893,7 @@ function setMatchOutcomeFeedbackFromSummary(summary) {
 
   const codePool = getSummaryCodePool(summary);
   const poolLabel = getCodePoolLabel(codePool);
+  const rewardBackend = getActiveRewardBackend(model.session, model.rewards);
 
   if (summary.awardBlockedReason) {
     setMatchFeedback(getAwardBlockedMessage(summary.awardBlockedReason, codePool), 'warn');
@@ -646,12 +901,22 @@ function setMatchOutcomeFeedbackFromSummary(summary) {
   }
 
   if (!summary.playerWon) {
-    setMatchFeedback(`这局没有派发 ${poolLabel} CDK，因为当前玩家不在胜方阵营。`, 'warn');
+    setMatchFeedback(
+      rewardBackend === 'newapi'
+        ? `这局没有发放 ${poolLabel} 奖励，因为当前玩家不在胜方阵营。`
+        : `这局没有派发 ${poolLabel} CDK，因为当前玩家不在胜方阵营。`,
+      'warn'
+    );
     return;
   }
 
   if (!summary.playerIsMvp) {
-    setMatchFeedback(`这局没有派发 ${poolLabel} CDK，因为当前玩家不是胜方 MVP。`, 'warn');
+    setMatchFeedback(
+      rewardBackend === 'newapi'
+        ? `这局没有发放 ${poolLabel} 奖励，因为当前玩家不是胜方 MVP。`
+        : `这局没有派发 ${poolLabel} CDK，因为当前玩家不是胜方 MVP。`,
+      'warn'
+    );
     return;
   }
 
@@ -660,11 +925,11 @@ function setMatchOutcomeFeedbackFromSummary(summary) {
 
 function getAwardBlockedMessage(reason, pool = 'pve', limitStatus = null) {
   if (reason === 'easy_difficulty') {
-    return '这是旧规则留下的历史记录：当时 PVE 的 easy/novice 不发 CDK。';
+    return '当前规则下，PVE 的 novice / easy 不发奖励。';
   }
 
   if (reason === 'daily_limit_disabled') {
-    return '当前这档难度的每日发码额度被设为 0，暂时不会派发 CDK。';
+    return '当前这档难度的奖励额度被设为 0，暂时不会发放。';
   }
 
   if (reason === 'daily_limit_reached') {
@@ -674,22 +939,22 @@ function getAwardBlockedMessage(reason, pool = 'pve', limitStatus = null) {
   }
 
   if (reason === 'match_too_short') {
-    return '这局结束得过快，服务端未通过奖励校验。请正常完成一局后再领取 CDK。';
+    return '这局结束得过快，服务端未通过奖励校验。请正常完成一局后再领取奖励。';
   }
 
   if (reason === 'pvp_rewards_disabled') {
-    return `当前在线 ${getPoolLabel(pool)} 奖励开关仍然关闭，本局不会自动派发 ${getPoolLabel(pool)} CDK。`;
+    return `当前在线 ${getPoolLabel(pool)} 奖励开关仍然关闭，本局不会自动发放奖励。`;
   }
 
   if (reason === 'timeout_zero_kill') {
-    return '这局被判定为无效局：105 秒结束且 0 击杀，不会派发 CDK。';
+    return '这局被判定为无效局：105 秒结束且 0 击杀，不会发放奖励。';
   }
 
   if (reason === 'server_verification_required') {
-    return '当前已关闭基于客户端上报战绩的自动发码。需要等服务端验证能力上线后，才会恢复自动派发 CDK。';
+    return '当前已关闭基于客户端上报战绩的自动奖励发放。需要等服务端验证能力上线后，才会恢复自动派奖。';
   }
 
-  return `${getPoolLabel(pool)} 这局不符合发码条件。`;
+  return `${getPoolLabel(pool)} 这局不符合奖励条件。`;
 }
 
 async function prepareAwardForSummary(summary) {
@@ -709,7 +974,7 @@ async function prepareAwardForSummary(summary) {
       setMatchOutcomeFeedbackFromSummary(summary);
       return;
     }
-    setMatchFeedback('请在下一局开始前先登录，这样才能参与 MVP 派码。', 'warn');
+    setMatchFeedback('请在下一局开始前先登录，这样才能参与 MVP 领奖。', 'warn');
     return;
   }
 
@@ -739,7 +1004,7 @@ async function prepareAwardForSummary(summary) {
       })
     });
 
-    model.rewards = await apiRequest('/api/cdks/me');
+    model.rewards = await apiRequest('/api/rewards/me');
     renderSignedIn(model.session, model.rewards);
     renderMatchOutcomePanel();
 
@@ -761,11 +1026,16 @@ async function prepareAwardForSummary(summary) {
       return;
     }
 
-    if (result.alreadyClaimed && result.latestClaim?.code) {
+    if (result.alreadyClaimed && result.latestClaim) {
       const poolLabel = getPoolLabel(result.latestClaim.claimContext?.summary?.codePool || result.latestClaim.pool);
-      renderMatchCode(result.latestClaim.code);
+      renderMatchCode(
+        result.latestClaim.code || result.latestClaim.creditAmountLabel || null,
+        { copyable: Boolean(result.latestClaim.code) }
+      );
       elements.matchTitle.textContent = `这局 ${poolLabel} 奖励已经派发过了`;
-      elements.matchMeta.textContent = '同一局比赛对当前账号不会重复发多个兑换码。';
+      elements.matchMeta.textContent = result.latestClaim.code
+        ? '同一局比赛对当前账号不会重复发多个兑换码。'
+        : '同一局比赛对当前账号不会重复发多次余额。';
       setMatchFeedback('这局奖励已经领取过了。', 'ok');
       return;
     }
@@ -776,7 +1046,12 @@ async function prepareAwardForSummary(summary) {
       return;
     }
 
-    setMatchFeedback(`${poolLabel} 奖励已准备完成，现在可以领取 1 个兑换码。${formatLimitStatus(result.limitStatus)}`, 'ok');
+    setMatchFeedback(
+      result.rewardBackend === 'newapi'
+        ? `${poolLabel} 奖励已准备完成，现在可以领取到 42 API。${formatLimitStatus(result.limitStatus)}`
+        : `${poolLabel} 奖励已准备完成，现在可以领取 1 个兑换码。${formatLimitStatus(result.limitStatus)}`,
+      'ok'
+    );
   } catch (error) {
     const tone = error.message === 'award_not_eligible' ||
       error.message === 'match_ticket_missing' ||
@@ -804,6 +1079,7 @@ async function prepareAwardForSummary(summary) {
 async function handleMatchStarted(event) {
   model.latestMatchSummary = null;
   model.currentMatchTicket = null;
+  model.witnessSeq = 0; // Phase C：重置本局心跳序号
   renderMatchCode(null);
   setMatchFeedback('');
 
@@ -824,7 +1100,7 @@ async function handleMatchStarted(event) {
       })
     });
     model.currentMatchTicket = result.activeMatch || null;
-    model.rewards = await apiRequest('/api/cdks/me');
+    model.rewards = await apiRequest('/api/rewards/me');
     renderSignedIn(model.session, model.rewards);
   } catch (error) {
     model.currentMatchTicket = null;
@@ -842,6 +1118,34 @@ function handleMatchEnded(event) {
   }
 
   setMatchFeedback('');
+}
+
+// Phase C：把游戏内核派发的 PVE 见证心跳（kill/damage/match_end）转发到服务端。
+// 服务端据此累计独立的击杀/伤害/墙钟证据，prepare 结算时用见证数据而非客户端自报。
+// 失败静默（fire-and-forget），不阻塞游戏或领奖 UI；最坏情况是退回 server_verification_required。
+async function handlePveWitness(event) {
+  const ticket = model.currentMatchTicket;
+  if (!ticket?.ticketId || !model.session?.authenticated) return;
+
+  const detail = event?.detail || {};
+  model.witnessSeq = (model.witnessSeq || 0) + 1;
+  const payload = {
+    ticketId: ticket.ticketId,
+    event: {
+      seq: model.witnessSeq,
+      type: detail.type,
+      payload: detail.payload || {}
+    }
+  };
+
+  try {
+    await apiRequest('/api/awards/pve-event', {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+  } catch (_) {
+    // 心跳失败不影响游戏体验；见证不完整会被服务端在 prepare 时拒绝。
+  }
 }
 
 async function handlePvpMatchStarted() {
@@ -882,6 +1186,13 @@ function bindEvents() {
   elements.logoutButton?.addEventListener('click', logout);
   elements.copyButton?.addEventListener('click', () => copyValue(elements.codeValue.textContent.trim(), 'menu'));
   elements.matchCopyButton?.addEventListener('click', () => copyValue(elements.matchCodeValue.textContent.trim(), 'match'));
+  elements.redeemButton?.addEventListener('click', redeemCode);
+  elements.redeemInput?.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      redeemCode();
+    }
+  });
   elements.loginButton?.addEventListener('click', (event) => {
     if (elements.loginButton.classList.contains('is-disabled')) {
       event.preventDefault();
@@ -889,6 +1200,7 @@ function bindEvents() {
   });
   window.addEventListener('shooters-match-started', handleMatchStarted);
   window.addEventListener('shooters-match-ended', handleMatchEnded);
+  window.addEventListener('shooters-pve-witness', handlePveWitness);
   window.addEventListener('shooters-pvp-match-started', handlePvpMatchStarted);
   window.addEventListener('shooters-pvp-match-ended', handlePvpMatchEnded);
   window.addEventListener('shooters-pvp-match-aborted', handlePvpMatchAborted);

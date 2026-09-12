@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="shooters-asset-version" content="20260416-warzone-map-1" />
+  <meta name="shooters-asset-version" content="20260615-merge-backalley-reward-1" />
   <title>卡通大乱斗</title>
   <link rel="icon" type="image/x-icon" href="favicon.ico" />
   <style>
@@ -762,6 +762,22 @@
       display: none;
     }
 
+    body[data-mobile="true"] .mobileOnlyRow {
+      display: flex;
+    }
+
+    body[data-mobile="true"] .mobileOnlyBlock {
+      display: block;
+    }
+
+    .mobilePauseHint {
+      display: none;
+    }
+
+    body[data-mobile="true"] .mobilePauseHint {
+      display: block;
+    }
+
     #mobileControls {
       position: absolute;
       inset: 0;
@@ -931,7 +947,7 @@
       background: linear-gradient(180deg, rgba(159, 233, 255, 0.92), rgba(88, 200, 239, 0.82));
       border: 1px solid rgba(255, 255, 255, 0.24);
       box-shadow: 0 12px 18px rgba(29, 168, 216, 0.24);
-      transition: transform 0.04s linear;
+      transition: transform 0.08s ease-out;
     }
 
     #mobileMoveHint {
@@ -1029,6 +1045,15 @@
       box-shadow: 0 0 0 #1d4ed8, 0 4px 8px rgba(0, 0, 0, 0.3);
     }
 
+    .mobileBtn.primary[data-armed="true"] {
+      animation: mobileFirePulse 0.18s ease-in-out infinite alternate;
+    }
+
+    @keyframes mobileFirePulse {
+      0% { box-shadow: 0 4px 0 #1d4ed8, 0 8px 16px rgba(0, 0, 0, 0.3), 0 0 12px rgba(59, 130, 246, 0.2); }
+      100% { box-shadow: 0 2px 0 #1d4ed8, 0 4px 10px rgba(0, 0, 0, 0.3), 0 0 24px rgba(59, 130, 246, 0.5); }
+    }
+
     .mobileBtn.compact {
       min-width: 76px;
       min-height: 42px;
@@ -1038,6 +1063,28 @@
 
     .mobileBtn.ghost {
       background: rgba(7, 10, 15, 0.56);
+    }
+
+    .mobileCooldownOverlay {
+      position: absolute;
+      inset: 0;
+      border-radius: 18px;
+      pointer-events: none;
+      background: conic-gradient(
+        rgba(77, 231, 255, 0.35) var(--cd-pct, 0%),
+        transparent var(--cd-pct, 0%)
+      );
+      transition: background 0.1s linear;
+    }
+
+    .mobileBtn {
+      position: relative;
+      overflow: hidden;
+    }
+
+    .mobileBtn .mobileCooldownOverlay + :not(.mobileCooldownOverlay) {
+      position: relative;
+      z-index: 1;
     }
 
     .mobileBtn[data-armed="true"] {
@@ -1847,6 +1894,105 @@
       font-weight: 700;
     }
 
+    #accountRedeemInput {
+      flex: 1 1 140px;
+      min-width: 0;
+      padding: 8px 12px;
+      border-radius: 10px;
+      border: 1px solid rgba(126, 220, 255, 0.24);
+      background: rgba(126, 220, 255, 0.08);
+      color: #eaf9ff;
+      font-size: 13px;
+      font-weight: 600;
+      outline: none;
+    }
+
+    #accountRedeemInput::placeholder {
+      color: rgba(234, 249, 255, 0.42);
+    }
+
+    #accountRedeemInput:focus {
+      border-color: rgba(126, 220, 255, 0.5);
+      background: rgba(126, 220, 255, 0.14);
+    }
+
+    .accountRedeemCard #accountRedeemBtn {
+      flex: 0 0 auto;
+    }
+
+    .accountHistoryCard {
+      margin-top: 14px;
+      padding: 12px 14px;
+      border-radius: 14px;
+      background: rgba(1, 6, 11, 0.52);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .accountHistoryHead {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .accountHistoryHint {
+      color: rgba(255, 255, 255, 0.48);
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .accountHistoryList {
+      list-style: none;
+      margin: 10px 0 0;
+      padding: 0;
+      display: grid;
+      gap: 8px;
+    }
+
+    .accountHistoryItem {
+      display: grid;
+      gap: 4px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      background: rgba(126, 220, 255, 0.06);
+      border: 1px solid rgba(126, 220, 255, 0.08);
+    }
+
+    .accountHistoryTop {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .accountHistoryValue {
+      color: #f6fbff;
+      font-size: 13px;
+      font-weight: 800;
+      word-break: break-word;
+    }
+
+    .accountHistoryBadge {
+      display: inline-flex;
+      align-items: center;
+      border-radius: 999px;
+      padding: 3px 8px;
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      background: rgba(126, 220, 255, 0.16);
+      color: #bdefff;
+    }
+
+    .accountHistoryMeta {
+      color: rgba(255, 255, 255, 0.68);
+      font-size: 12px;
+      line-height: 1.5;
+      word-break: break-word;
+    }
+
     #accountFeedback {
       min-height: 20px;
       margin-top: 12px;
@@ -2090,6 +2236,20 @@
       padding: 12px 16px 10px;
     }
 
+    #hud[data-visual-density="compact"][data-mobile="true"] #mobileMovePad,
+    #hud[data-visual-density="compact"][data-mobile="true"] .mobileBtn {
+      opacity: 0.55;
+    }
+
+    #hud[data-visual-density="compact"][data-mobile="true"] #mobileLookZoneLabel,
+    #hud[data-visual-density="compact"][data-mobile="true"] #mobileMoveHint {
+      opacity: 0.3;
+    }
+
+    #hud[data-visual-density="compact"][data-mobile="true"] #mobileTopHud {
+      opacity: 0.7;
+    }
+
     @media (max-width: 900px) {
       #app {
         padding: 0;
@@ -2146,6 +2306,39 @@
         min-width: 190px;
       }
 
+      /* 小屏横屏菜单优化 */
+      .menuSurface {
+        padding: 16px;
+      }
+
+      .menuStats {
+        gap: 8px;
+        margin: 14px 0 12px;
+      }
+
+      .menuStat {
+        padding: 10px 12px;
+      }
+
+      .mapDeck {
+        gap: 8px;
+      }
+
+      .mapDeck .mapBtn {
+        padding: 8px 10px;
+        font-size: 12px;
+      }
+
+      .difficultyButtons {
+        gap: 6px;
+      }
+
+      .difficultyBtn {
+        min-height: 40px;
+        padding: 0 14px;
+        font-size: 12px;
+      }
+
       #mobileTopHud {
         grid-template-columns: minmax(0, 1fr);
       }
@@ -2181,6 +2374,22 @@
       #mobileWeaponBtn,
       #mobileGrenadeBtn {
         min-width: 118px;
+      }
+
+      /* 结算界面小屏适配 */
+      #matchOverlay .accountCard {
+        width: 100%;
+      }
+
+      #matchOverlay .accountActions {
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      #matchOverlay .accountActions .accountBtn {
+        flex: 1 1 auto;
+        min-width: 0;
+        justify-content: center;
       }
 
       #mobileLookZone {
@@ -2324,13 +2533,13 @@
           <div id="mobileActionDock">
             <div id="mobileTacticalDrawer" data-expanded="false">
               <button class="mobileBtn" id="mobileWeaponBtn" type="button">切枪</button>
-              <button class="mobileBtn" id="mobileGrenadeBtn" type="button">手雷</button>
+              <button class="mobileBtn" id="mobileGrenadeBtn" type="button"><span class="mobileCooldownOverlay"></span>手雷</button>
             </div>
             <div id="mobileActionRail">
               <button class="mobileBtn compact ghost" id="mobileTacticalBtn" type="button">战术</button>
               <div class="mobileActionRow">
                 <button class="mobileBtn" id="mobileReloadBtn" type="button">换弹</button>
-                <button class="mobileBtn" id="mobileDashBtn" type="button">闪避</button>
+                <button class="mobileBtn" id="mobileDashBtn" type="button"><span class="mobileCooldownOverlay"></span>闪避</button>
               </div>
               <button class="mobileBtn primary" id="mobileFireBtn" type="button">开火</button>
             </div>
@@ -2432,6 +2641,18 @@
                   <code id="accountCodeValue">-</code>
                   <button class="accountBtn secondary small" id="accountCopyBtn" type="button" hidden>复制</button>
                 </div>
+                <div class="accountCodeCard accountRedeemCard" id="accountRedeemCard" hidden>
+                  <span class="accountCodeLabel">兑换码</span>
+                  <input type="text" id="accountRedeemInput" placeholder="输入兑换码" autocomplete="off" maxlength="120" />
+                  <button class="accountBtn small" id="accountRedeemBtn" type="button">兑换</button>
+                </div>
+                <div class="accountHistoryCard" id="accountRewardHistory" hidden>
+                  <div class="accountHistoryHead">
+                    <span class="accountCodeLabel">Recent Rewards</span>
+                    <span class="accountHistoryHint">42 API / CDK</span>
+                  </div>
+                  <ul class="accountHistoryList" id="accountRewardHistoryList"></ul>
+                </div>
                 <div id="accountFeedback"></div>
               </div>
             </div>
@@ -2440,6 +2661,7 @@
         <div id="pauseOverlay" class="overlay">
           <h1>已暂停</h1>
           <div class="subtitle">按 面板 P键 / Esc键 恢复游戏</div>
+          <div class="subtitle mobilePauseHint" style="margin-top: -6px;">触屏用户点下方「继续游戏」按钮恢复</div>
           <div class="accountActions mobileOnlyRow">
             <button class="accountBtn" id="touchPauseResumeBtn" type="button">继续游戏</button>
           </div>
@@ -2622,7 +2844,7 @@
           pitchMin: -1.15,
           pitchMax: 1.15,
           sensitivity: 0.0048,
-          touchSensitivityMultiplier: 1.2,
+          touchSensitivityMultiplier: 1.5,
           maxMouseDelta: 960,
           maxTouchDelta: 72,
           maxYawStep: 2.85,
@@ -2959,6 +3181,12 @@
         tags: Object.freeze(['50×36', '超远射线', '多路绕侧']),
         hint: 'Warzone 更适合狙击和长线压制，近身混战不是这张图的主旋律。'
       }),
+      backalley: Object.freeze({
+        eyebrow: 'Asymmetric Alley',
+        description: '左右不对称布局，一侧掩体密集一侧开阔，考验攻防转换和地形利用。',
+        tags: Object.freeze(['36×24', '非对称', '巷战攻防']),
+        hint: 'BackAlley 需要根据出生位置调整策略，不要死板套用对称图打法。'
+      }),
       random: Object.freeze({
         eyebrow: 'Wildcard Rotation',
         description: '每局随机决定地图，适合开房轮换，减少单张图被背板后的套路感。',
@@ -2978,7 +3206,9 @@
       moveX: 0,
       moveY: 0,
       lookLastX: 0,
-      lookLastY: 0
+      lookLastY: 0,
+      lookInertiaX: 0,
+      lookInertiaY: 0
     };
 
     const hudPanels = new Map();
@@ -3457,6 +3687,37 @@
     function setupScene() {
       world.scene.background = new THREE.Color(0xCFE6FF);
       world.scene.fog = new THREE.Fog(0xEFD9B1, 24, 70);
+      // 渐变天空穹顶：颜色随地图主题在 applyMapEnvironment 里切换
+      const skyGeometry = new THREE.SphereGeometry(165, 24, 12);
+      const skyMaterial = new THREE.ShaderMaterial({
+        side: THREE.BackSide,
+        depthWrite: false,
+        fog: false,
+        uniforms: {
+          topColor: { value: new THREE.Color(0x3E7FD6) },
+          horizonColor: { value: new THREE.Color(0xCFE6FF) }
+        },
+        vertexShader: [
+          'varying vec3 vPosition;',
+          'void main() {',
+          '  vPosition = position;',
+          '  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);',
+          '}'
+        ].join('\n'),
+        fragmentShader: [
+          'varying vec3 vPosition;',
+          'uniform vec3 topColor;',
+          'uniform vec3 horizonColor;',
+          'void main() {',
+          '  float h = clamp(normalize(vPosition).y, 0.0, 1.0);',
+          '  float t = pow(smoothstep(0.0, 0.5, h), 0.85);',
+          '  gl_FragColor = vec4(mix(horizonColor, topColor, t), 1.0);',
+          '}'
+        ].join('\n')
+      });
+      world.skyDome = new THREE.Mesh(skyGeometry, skyMaterial);
+      world.skyDome.frustumCulled = false;
+      world.scene.add(world.skyDome);
     }
 
     function setupCamera() {
@@ -3477,13 +3738,19 @@
       const dir = new THREE.DirectionalLight(0xfff2d6, CONFIG.lighting.dir);
       dir.position.set(12, 24, 8);
       dir.castShadow = true;
-      dir.shadow.mapSize.set(1024, 1024);
+      dir.shadow.mapSize.set(2048, 2048);
       dir.shadow.camera.left = -20;
       dir.shadow.camera.right = 20;
       dir.shadow.camera.top = 20;
       dir.shadow.camera.bottom = -20;
       dir.shadow.camera.near = 1;
-      dir.shadow.camera.far = 60;
+      dir.shadow.camera.far = 160;
+      dir.shadow.bias = -0.0004;
+      dir.shadow.normalBias = 0.02;
+      // 保留引用，applyMapEnvironment 按地图主题调整颜色/强度/阴影范围
+      world.ambientLight = ambient;
+      world.hemiLight = hemi;
+      world.keyLight = dir;
       world.scene.add(ambient, hemi, dir);
     }
 
@@ -3726,6 +3993,7 @@
     function updateMobileMode() {
       mobileState.active = shouldUseMobileControls();
       mobileState.orientationBlocked = shouldBlockMobilePortrait();
+      document.body.dataset.mobile = mobileState.active ? 'true' : 'false';
       syncMobileHudState();
       if (mobileState.active && !mobileState.orientationBlocked && isAnyPlayingMode() && state.viewMode !== 'fps') {
         setViewMode('fps', { skipPointerLock: true });
@@ -3765,6 +4033,8 @@
       mobileState.lookPointerId = null;
       mobileState.lookLastX = 0;
       mobileState.lookLastY = 0;
+      mobileState.lookInertiaX = 0;
+      mobileState.lookInertiaY = 0;
     }
 
     function setMobileFire(active) {
@@ -3772,8 +4042,10 @@
       if (active) {
         input.mouse.justPressed = true;
         mobileFireBtn?.setAttribute('data-armed', 'true');
+        navigator.vibrate?.(30);
       } else {
         mobileFireBtn?.removeAttribute('data-armed');
+        navigator.vibrate?.(10);
       }
     }
 
@@ -3939,10 +4211,28 @@
         dx *= scale;
         dy *= scale;
       }
-      mobileState.moveX = dx / radius;
-      mobileState.moveY = -dy / radius;
+      // 中心死区：距离小于半径 12% 时回零，防止漂移
+      const DEAD_ZONE_RATIO = 0.12;
+      const deadZonePx = radius * DEAD_ZONE_RATIO;
+      if (dist < deadZonePx) {
+        mobileState.moveX = 0;
+        mobileState.moveY = 0;
+        if (mobileMoveThumbEl) {
+          mobileMoveThumbEl.style.transform = 'translate(0px, 0px)';
+        }
+        return;
+      }
+      // 把死区外的范围重新映射到 0-1 区间
+      const effectiveDist = dist - deadZonePx;
+      const effectiveRadius = radius - deadZonePx;
+      const clampedDist = Math.min(effectiveDist, effectiveRadius);
+      const ratio = clampedDist / effectiveRadius;
+      const outX = (dx / dist) * ratio;
+      const outY = (dy / dist) * ratio;
+      mobileState.moveX = outX;
+      mobileState.moveY = -outY;
       if (mobileMoveThumbEl) {
-        mobileMoveThumbEl.style.transform = `translate(${dx.toFixed(1)}px, ${dy.toFixed(1)}px)`;
+        mobileMoveThumbEl.style.transform = `translate(${outX.toFixed(1)}px, ${outY.toFixed(1)}px)`;
       }
     }
 
@@ -3975,6 +4265,8 @@
       }
       const dx = event.clientX - mobileState.lookLastX;
       const dy = event.clientY - mobileState.lookLastY;
+      mobileState.lookInertiaX = dx;
+      mobileState.lookInertiaY = dy;
       applyFpsLookInput(dx, dy, 'touch');
       mobileState.lookLastX = event.clientX;
       mobileState.lookLastY = event.clientY;
@@ -4580,6 +4872,319 @@
 	      world.arenaLayout = null;
 	    }
 
+    /* ================= 每张地图的环境主题（纯视觉层，不改变玩法碰撞） ================= */
+    const MAP_ENVIRONMENT_THEMES = {
+      classic: {
+        label: '正午训练场',
+        sky: { top: 0x3E7FD6, horizon: 0xCFE6FF },
+        fog: { color: 0xC9DCF0, near: 30, far: 95 },
+        sun: { color: 0xFFF3D8, intensity: 1.15, position: [16, 28, 10] },
+        hemi: { sky: 0xBFD9F2, ground: 0x9A7B52, intensity: 0.75 },
+        ambient: 0.34,
+        ground: { base: 0xC9A36A, blotch: 0xB08D54, accent: 0x9C7743 },
+        farGround: 0x8F7046,
+        border: 0x8B6A3E,
+        marking: 0xF2E6CC,
+        scenery: ['Tree_1', 'Tree_2', 'StreetLight', 'Structure_3', 'Debris_Pile', 'TrashContainer_Open']
+      },
+      crossfire: {
+        label: '黄昏码头',
+        sky: { top: 0x4A3F7E, horizon: 0xFF9E5A },
+        fog: { color: 0xE0955F, near: 26, far: 90 },
+        sun: { color: 0xFFAF5E, intensity: 1.0, position: [-20, 12, 10] },
+        hemi: { sky: 0xD89A6E, ground: 0x6E5340, intensity: 0.6 },
+        ambient: 0.3,
+        ground: { base: 0xB08F5E, blotch: 0x9A7848, accent: 0x86663C },
+        farGround: 0x775C3B,
+        border: 0x6E4E2E,
+        marking: 0xFFE2B8,
+        scenery: ['Tree_3', 'StreetLight', 'Container_Long', 'TrashContainer', 'Debris_Tires', 'Pipes']
+      },
+      stronghold: {
+        label: '清晨前哨',
+        sky: { top: 0x7FB2D9, horizon: 0xEAF2E4 },
+        fog: { color: 0xDDE8DC, near: 20, far: 78 },
+        sun: { color: 0xFFF0D0, intensity: 0.95, position: [22, 16, 8] },
+        hemi: { sky: 0xC8DDE8, ground: 0x7A8560, intensity: 0.7 },
+        ambient: 0.34,
+        ground: { base: 0x9AA36B, blotch: 0x86915A, accent: 0x74804C },
+        farGround: 0x66713F,
+        border: 0x5E6838,
+        marking: 0xF0F4DE,
+        scenery: ['Tree_1', 'Tree_4', 'SackTrench', 'BrickWall_1', 'StreetLight']
+      },
+      frontier: {
+        label: '荒漠午后',
+        sky: { top: 0x8FBFDF, horizon: 0xF2DCAC },
+        fog: { color: 0xE8D5A8, near: 30, far: 105 },
+        sun: { color: 0xFFF5DC, intensity: 1.2, position: [10, 30, -14] },
+        hemi: { sky: 0xD8E2EA, ground: 0xB09058, intensity: 0.7 },
+        ambient: 0.36,
+        ground: { base: 0xD2B27A, blotch: 0xC09C64, accent: 0xA8854E },
+        farGround: 0x9A7B4C,
+        border: 0x8A6B3E,
+        marking: 0xFFF0D0,
+        scenery: ['Tree_2', 'Debris_Tires', 'WaterTank_Floor', 'Pallet_Broken', 'TrashContainer_Open']
+      },
+      bunker: {
+        label: '夜半地堡',
+        sky: { top: 0x060B18, horizon: 0x1B2A44 },
+        fog: { color: 0x141F33, near: 20, far: 64 },
+        sun: { color: 0xA9C0EA, intensity: 0.62, position: [-14, 26, -8] },
+        hemi: { sky: 0x3A4E6E, ground: 0x232830, intensity: 0.62 },
+        ambient: 0.34,
+        ground: { base: 0x4E5346, blotch: 0x43483C, accent: 0x3A3E34 },
+        farGround: 0x2C302A,
+        border: 0x39404E,
+        marking: 0x8FA3C4,
+        scenery: ['StreetLight', 'Barrier_Fixed', 'BrickWall_2', 'TrashContainer_Open', 'Debris_Pile', 'Pipes']
+      },
+      warzone: {
+        label: '阴天废墟',
+        sky: { top: 0x6E7C88, horizon: 0xB4BBC0 },
+        fog: { color: 0xA8AEB2, near: 34, far: 120 },
+        sun: { color: 0xE2E7EA, intensity: 0.8, position: [18, 30, 6] },
+        hemi: { sky: 0xAEB6BC, ground: 0x6E6A58, intensity: 0.65 },
+        ambient: 0.38,
+        ground: { base: 0x8E8873, blotch: 0x7C7663, accent: 0x6A6552 },
+        farGround: 0x5C5848,
+        border: 0x565248,
+        marking: 0xD8D8CC,
+        scenery: ['Structure_4', 'Debris_Pile', 'Debris_BrokenCar', 'BrickWall_1', 'Pallet_Broken', 'Tree_3']
+      },
+      backalley: {
+        label: '雨夜小巷',
+        sky: { top: 0x100E20, horizon: 0x33284A },
+        fog: { color: 0x241E38, near: 22, far: 72 },
+        sun: { color: 0x9AAAE0, intensity: 0.55, position: [12, 24, 14] },
+        hemi: { sky: 0x443E60, ground: 0x2C2638, intensity: 0.6 },
+        ambient: 0.36,
+        ground: { base: 0x565264, blotch: 0x4A4956, accent: 0x3E3D48 },
+        farGround: 0x32303C,
+        border: 0x4E4658,
+        marking: 0xC8B8E0,
+        scenery: ['StreetLight', 'TrashContainer', 'TrashContainer_Open', 'Debris_Papers_1', 'Pipes', 'BrickWall_2']
+      }
+    };
+    const groundTextureCache = new Map();
+
+    function hashStringToSeed(value) {
+      let hash = 2166136261;
+      for (let i = 0; i < value.length; i++) {
+        hash ^= value.charCodeAt(i);
+        hash = Math.imul(hash, 16777619);
+      }
+      return hash >>> 0;
+    }
+
+    function mulberry32(seed) {
+      let state = seed >>> 0;
+      return function () {
+        state = (state + 0x6D2B79F5) | 0;
+        let t = Math.imul(state ^ (state >>> 15), 1 | state);
+        t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+      };
+    }
+
+    function rgbaFromHex(hex, alpha) {
+      const value = Number(hex) & 0xffffff;
+      return `rgba(${(value >> 16) & 255},${(value >> 8) & 255},${value & 255},${alpha})`;
+    }
+
+    function getMapEnvironmentTheme(mapId) {
+      return MAP_ENVIRONMENT_THEMES[mapId] || MAP_ENVIRONMENT_THEMES.classic;
+    }
+
+    function createGroundTexture(mapId, theme) {
+      if (groundTextureCache.has(mapId)) return groundTextureCache.get(mapId);
+      const size = 512;
+      const canvas = document.createElement('canvas');
+      canvas.width = size;
+      canvas.height = size;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = rgbaFromHex(theme.ground.base, 1);
+      ctx.fillRect(0, 0, size, size);
+      const rand = mulberry32(hashStringToSeed(`${mapId}:ground`));
+      for (let i = 0; i < 22; i++) {
+        const x = rand() * size;
+        const y = rand() * size;
+        const r = 36 + rand() * 96;
+        const gradient = ctx.createRadialGradient(x, y, 0, x, y, r);
+        gradient.addColorStop(0, rgbaFromHex(theme.ground.blotch, 0.15));
+        gradient.addColorStop(1, rgbaFromHex(theme.ground.blotch, 0));
+        ctx.fillStyle = gradient;
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      for (let i = 0; i < 2400; i++) {
+        const x = rand() * size;
+        const y = rand() * size;
+        const s = 1 + rand() * 2.2;
+        ctx.fillStyle = rand() < 0.5 ? rgbaFromHex(theme.ground.accent, 0.16) : 'rgba(255,255,255,0.06)';
+        ctx.fillRect(x, y, s, s);
+      }
+      ctx.strokeStyle = rgbaFromHex(theme.ground.accent, 0.1);
+      ctx.lineWidth = 6;
+      for (let i = 0; i < 7; i++) {
+        const x = rand() * size;
+        const y = rand() * size;
+        ctx.beginPath();
+        ctx.arc(x, y, 40 + rand() * 80, rand() * Math.PI * 2, rand() * Math.PI * 2);
+        ctx.stroke();
+      }
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.wrapS = THREE.RepeatWrapping;
+      texture.wrapT = THREE.RepeatWrapping;
+      texture.colorSpace = THREE.SRGBColorSpace;
+      texture.anisotropy = 4;
+      groundTextureCache.set(mapId, texture);
+      return texture;
+    }
+
+    function createThemedGround(groundWidth, groundDepth, mapId) {
+      const theme = getMapEnvironmentTheme(mapId);
+      const texture = createGroundTexture(mapId, theme);
+      texture.repeat.set(Math.max(3, groundWidth / 10), Math.max(3, groundDepth / 10));
+      const mesh = new THREE.Mesh(
+        new THREE.PlaneGeometry(groundWidth, groundDepth),
+        new THREE.MeshStandardMaterial({ map: texture, roughness: 0.95, metalness: 0.02 })
+      );
+      mesh.rotation.x = -Math.PI / 2;
+      mesh.receiveShadow = true;
+      return mesh;
+    }
+
+    function applyMapEnvironment(mapId) {
+      const theme = getMapEnvironmentTheme(mapId);
+      const mapDefinition = getActiveMapDefinition(mapId);
+      if (world.skyDome) {
+        world.skyDome.material.uniforms.topColor.value.set(theme.sky.top);
+        world.skyDome.material.uniforms.horizonColor.value.set(theme.sky.horizon);
+      }
+      if (world.scene.background) world.scene.background.set(theme.sky.horizon);
+      if (world.scene.fog) {
+        world.scene.fog.color.set(theme.fog.color);
+        world.scene.fog.near = theme.fog.near;
+        world.scene.fog.far = theme.fog.far;
+      }
+      if (world.keyLight) {
+        world.keyLight.color.set(theme.sun.color);
+        world.keyLight.intensity = theme.sun.intensity;
+        world.keyLight.position.set(theme.sun.position[0], theme.sun.position[1], theme.sun.position[2]);
+        const extent = Math.max(mapDefinition.arena.width, mapDefinition.arena.depth) * 0.72 + 8;
+        const shadowCamera = world.keyLight.shadow.camera;
+        shadowCamera.left = -extent;
+        shadowCamera.right = extent;
+        shadowCamera.top = extent;
+        shadowCamera.bottom = -extent;
+        shadowCamera.near = 1;
+        shadowCamera.far = 160;
+        shadowCamera.updateProjectionMatrix();
+      }
+      if (world.hemiLight) {
+        world.hemiLight.color.set(theme.hemi.sky);
+        world.hemiLight.groundColor.set(theme.hemi.ground);
+        world.hemiLight.intensity = theme.hemi.intensity;
+      }
+      if (world.ambientLight) world.ambientLight.intensity = theme.ambient;
+    }
+
+    function createArenaBoundaryMarkings(mapId) {
+      const theme = getMapEnvironmentTheme(mapId);
+      const bounds = CONFIG.arena.bounds;
+      const width = bounds.maxX - bounds.minX;
+      const depth = bounds.maxZ - bounds.minZ;
+      const group = new THREE.Group();
+      const material = new THREE.MeshBasicMaterial({
+        color: theme.marking,
+        transparent: true,
+        opacity: 0.26,
+        depthWrite: false
+      });
+      const stripes = [
+        { w: width - 1.2, d: 0.32, x: 0, z: bounds.minZ + 0.5 },
+        { w: width - 1.2, d: 0.32, x: 0, z: bounds.maxZ - 0.5 },
+        { w: 0.32, d: depth - 1.2, x: bounds.minX + 0.5, z: 0 },
+        { w: 0.32, d: depth - 1.2, x: bounds.maxX - 0.5, z: 0 }
+      ];
+      stripes.forEach((stripe) => {
+        const mesh = new THREE.Mesh(new THREE.PlaneGeometry(stripe.w, stripe.d), material);
+        mesh.rotation.x = -Math.PI / 2;
+        mesh.position.set(stripe.x, 0.022, stripe.z);
+        group.add(mesh);
+      });
+      const ring = new THREE.Mesh(new THREE.RingGeometry(2.7, 3.0, 48), material);
+      ring.rotation.x = -Math.PI / 2;
+      ring.position.set(0, 0.022, 0);
+      group.add(ring);
+      return group;
+    }
+
+    function dressArenaScenery(mapId, groundWidth, groundDepth) {
+      const theme = getMapEnvironmentTheme(mapId);
+      const manifest = assets?.manifest?.assets?.toonshooter;
+      if (!manifest) return;
+      const bounds = CONFIG.arena.bounds;
+      // 远景垫底圆盘：围墙外不再是空的雾色
+      const underlayRadius = Math.hypot(groundWidth, groundDepth) * 0.72 + 34;
+      const underlay = new THREE.Mesh(
+        new THREE.CircleGeometry(underlayRadius, 48),
+        new THREE.MeshStandardMaterial({ color: theme.farGround, roughness: 1, metalness: 0 })
+      );
+      underlay.rotation.x = -Math.PI / 2;
+      underlay.position.y = -0.06;
+      underlay.receiveShadow = false;
+      underlay.castShadow = false;
+      world.scene.add(underlay);
+      world.arenaObjects.push(underlay);
+      const rand = mulberry32(hashStringToSeed(`${mapId}:scenery`));
+      const putProp = (key, x, z, minScale, maxScale) => {
+        const path = manifest.environment?.[key];
+        if (!path) return;
+        const clone = cloneAsset(path);
+        if (!clone) return;
+        const root = normalizeToHeight(clone.root, null);
+        root.traverse?.((child) => {
+          if (child.isMesh) {
+            child.castShadow = true;
+            child.receiveShadow = true;
+          }
+        });
+        root.position.set(x, 0, z);
+        root.rotation.y = rand() * Math.PI * 2;
+        root.scale.multiplyScalar(minScale + rand() * (maxScale - minScale));
+        world.scene.add(root);
+        world.arenaObjects.push(root);
+      };
+      // 围墙外一圈：道具剪影让世界延伸出战场
+      const sides = [
+        { axis: 'z', sign: -1, length: bounds.maxX - bounds.minX },
+        { axis: 'z', sign: 1, length: bounds.maxX - bounds.minX },
+        { axis: 'x', sign: -1, length: bounds.maxZ - bounds.minZ },
+        { axis: 'x', sign: 1, length: bounds.maxZ - bounds.minZ }
+      ];
+      sides.forEach((side) => {
+        const count = Math.max(3, Math.min(8, Math.round(side.length / 6)));
+        for (let i = 0; i < count; i++) {
+          const u = (i + 0.5) / count + (rand() - 0.5) * 0.4;
+          const along = (side.axis === 'z' ? bounds.minX : bounds.minZ) + side.length * u;
+          const dist = 2.4 + rand() * 4.6;
+          const key = theme.scenery[Math.floor(rand() * theme.scenery.length)];
+          if (side.axis === 'z') putProp(key, along, side.sign < 0 ? bounds.minZ - dist : bounds.maxZ + dist, 0.8, 1.5);
+          else putProp(key, side.sign < 0 ? bounds.minX - dist : bounds.maxX + dist, along, 0.8, 1.5);
+        }
+      });
+      // 更远的散布剪影，被雾色柔化成背景
+      for (let i = 0; i < 9; i++) {
+        const angle = rand() * Math.PI * 2;
+        const radius = underlayRadius * (0.45 + rand() * 0.4);
+        const key = theme.scenery[Math.floor(rand() * theme.scenery.length)];
+        putProp(key, Math.cos(angle) * radius, Math.sin(angle) * radius, 1.1, 2.0);
+      }
+    }
+
     function buildArena(mapId = state.activeMapId || PVP_DEFAULT_MAP_ID) {
       const manifest = assets.manifest.assets.toonshooter;
       const mapDefinition = getActiveMapDefinition(mapId);
@@ -4589,21 +5194,18 @@
       const decorativePlacements = Array.isArray(localMap.decorativePlacements) ? localMap.decorativePlacements : [];
       const fallbackSizes = localMap.fallbackSizes || {};
       const fenceConfig = localMap.fence || { key: 'Fence_Long', offset: 0.4, scale: 1.1 };
-      const ground = new THREE.Mesh(
-        new THREE.PlaneGeometry(
-          arenaDefinition.ground.width * (CONFIG.arena.width / arenaDefinition.width),
-          arenaDefinition.ground.depth * (CONFIG.arena.depth / arenaDefinition.depth)
-        ),
-        new THREE.MeshStandardMaterial({ color: COLORS.dust, roughness: 0.9, metalness: 0.05 })
+      applyMapEnvironment(mapDefinition.id);
+      const ground = createThemedGround(
+        arenaDefinition.ground.width * (CONFIG.arena.width / arenaDefinition.width),
+        arenaDefinition.ground.depth * (CONFIG.arena.depth / arenaDefinition.depth),
+        mapDefinition.id
       );
-      ground.rotation.x = -Math.PI / 2;
-      ground.receiveShadow = true;
       world.scene.add(ground);
       world.arenaObjects.push(ground);
 
       const border = new THREE.LineSegments(
         new THREE.EdgesGeometry(new THREE.PlaneGeometry(CONFIG.arena.width, CONFIG.arena.depth)),
-        new THREE.LineBasicMaterial({ color: COLORS.dustDark })
+        new THREE.LineBasicMaterial({ color: getMapEnvironmentTheme(mapDefinition.id).border })
       );
       border.rotation.x = -Math.PI / 2;
       border.position.y = 0.02;
@@ -4749,6 +5351,13 @@
         fallbackSizes,
         fenceSegments
       };
+
+      const markings = createArenaBoundaryMarkings(mapDefinition.id);
+      world.scene.add(markings);
+      world.arenaObjects.push(markings);
+      dressArenaScenery(mapDefinition.id,
+        arenaDefinition.ground.width * (CONFIG.arena.width / arenaDefinition.width),
+        arenaDefinition.ground.depth * (CONFIG.arena.depth / arenaDefinition.depth));
 
       spawnBarrels(mapDefinition.id);
       buildCoverNodes(mapDefinition.id);
@@ -5516,7 +6125,7 @@
 
       const identity = document.createElement('div');
       const title = document.createElement('strong');
-      title.textContent = player?.displayName || player?.username || player?.userId || 'Player';
+      title.textContent = player?.username || player?.displayName || player?.userId || 'Player';
       const subline = document.createElement('small');
       subline.textContent = player?.username || player?.userId || '-';
       identity.append(title, subline);
@@ -5609,19 +6218,15 @@
       CONFIG.arena.width = arenaDefinition.width;
       CONFIG.arena.depth = arenaDefinition.depth;
       CONFIG.arena.bounds = { ...arenaDefinition.bounds };
+      applyMapEnvironment(mapDefinition.id);
 
-      const ground = new THREE.Mesh(
-        new THREE.PlaneGeometry(groundDefinition.width, groundDefinition.depth),
-        new THREE.MeshStandardMaterial({ color: COLORS.dust, roughness: 0.9, metalness: 0.05 })
-      );
-      ground.rotation.x = -Math.PI / 2;
-      ground.receiveShadow = true;
+      const ground = createThemedGround(groundDefinition.width, groundDefinition.depth, mapDefinition.id);
       world.scene.add(ground);
       world.arenaObjects.push(ground);
 
       const border = new THREE.LineSegments(
         new THREE.EdgesGeometry(new THREE.PlaneGeometry(CONFIG.arena.width, CONFIG.arena.depth)),
-        new THREE.LineBasicMaterial({ color: COLORS.dustDark })
+        new THREE.LineBasicMaterial({ color: getMapEnvironmentTheme(mapDefinition.id).border })
       );
       border.rotation.x = -Math.PI / 2;
       border.position.y = 0.02;
@@ -5745,6 +6350,11 @@
         fallbackSizes,
         fenceSegments
       };
+
+      const markings = createArenaBoundaryMarkings(mapDefinition.id);
+      world.scene.add(markings);
+      world.arenaObjects.push(markings);
+      dressArenaScenery(mapDefinition.id, groundDefinition.width, groundDefinition.depth);
     }
 
     function configureEntityFromLiveSnapshot(entity, playerSnapshot, predicted = null) {
@@ -5796,7 +6406,7 @@
         spawn: new THREE.Vector3(playerSnapshot.x || 0, 0, playerSnapshot.z || 0)
       });
       entity.userId = playerSnapshot.userId;
-      entity.displayName = playerSnapshot.displayName || playerSnapshot.username || playerSnapshot.userId || `Player ${index + 1}`;
+      entity.displayName = playerSnapshot.username || playerSnapshot.displayName || playerSnapshot.userId || `Player ${index + 1}`;
       entity.isPlayer = playerSnapshot.team === localTeam;
       entity.isAI = false;
       configureEntityFromLiveSnapshot(entity, playerSnapshot);
@@ -6100,12 +6710,12 @@
           : '服务器中断或房间异常关闭，本局不会自动发码。';
       } else {
         const winner = result?.stats?.find((entry) => entry.won) || null;
-        const winnerName = winner?.displayName || winner?.username || result?.winnerTeam || '未知玩家';
+        const winnerName = winner?.username || winner?.displayName || result?.winnerTeam || '未知玩家';
         const mvp = result?.stats?.find((entry) => String(entry.userId) === String(result?.mvpUserId)) || null;
         matchTitle.textContent = wasSpectating ? '观赛结束' : `${winnerName} 获胜`;
         matchStats.textContent = wasSpectating
-          ? `本场胜者: ${winnerName} · MVP: ${mvp?.displayName || mvp?.username || '无'}`
-          : `在线 PVP 已结束 · MVP: ${mvp?.displayName || mvp?.username || '无'} · 不触发自动发码`;
+          ? `本场胜者: ${winnerName} · MVP: ${mvp?.username || mvp?.displayName || '无'}`
+          : `在线 PVP 已结束 · MVP: ${mvp?.username || mvp?.displayName || '无'} · 不触发自动发码`;
       }
       bestTimeEnd.textContent = wasSpectating
         ? '当前只是观赛，不触发任何奖励。'
@@ -6246,6 +6856,20 @@
           matchType: getEffectiveGameMode(state.gameMode)?.matchType || 'pve'
         }
       }));
+    }
+
+    // Phase C：PVE 见证心跳。仅当玩家本人造成击杀/伤害且当前是 PVE 对局时，
+    // 向 account-panel 派发 shooters-pve-witness 事件，由其转发到 /api/awards/pve-event。
+    // PVP 对局走服务端权威推演，不派发心跳。
+    function emitPveWitness(type, payload) {
+      const matchType = getEffectiveGameMode(state.gameMode)?.matchType || 'pve';
+      if (matchType !== 'pve') return;
+      if (!state || state.mode !== 'playing') return;
+      try {
+        window.dispatchEvent(new CustomEvent('shooters-pve-witness', {
+          detail: { type, payload: payload || {} }
+        }));
+      } catch (_) { /* 心跳失败不影响游戏 */ }
     }
 
     function resetEntities() {
@@ -8559,6 +9183,9 @@
 
       if (attacker && attacker !== target) {
         attacker.matchStats.damageDealt += damageApplied;
+        if (attacker === getPlayer()) {
+          emitPveWitness('damage', { amount: Math.round(damageApplied) });
+        }
       }
       target.matchStats.damageTaken += damageApplied;
 
@@ -8589,6 +9216,9 @@
       target.matchStats.deaths += 1;
       if (attacker && attacker !== target) {
         attacker.matchStats.kills += 1;
+        if (attacker === getPlayer()) {
+          emitPveWitness('kill', { kills: 1 });
+        }
       }
       playDeathAnimation(target);
       // Bigger hit effect on death
@@ -9502,8 +10132,8 @@
         playerIsMvp,
         eligibleForAward: Boolean(playerWon && playerIsMvp),
         mvpTeam: mvp?.team || null,
-        mvpName: mvp?.displayName || mvp?.id || null,
-        playerName: player?.displayName || player?.id || null,
+        mvpName: mvp?.username || mvp?.displayName || mvp?.id || null,
+        playerName: player?.username || player?.displayName || player?.id || null,
         matchDurationSeconds: Math.max(0, Math.round((elapsedSeconds || 0) * 100) / 100),
         playerStats: player
           ? {
@@ -9523,6 +10153,8 @@
       const elapsed = CONFIG.match.totalTime - state.timeLeft;
       const matchSummary = buildMatchAwardSummary(winner, elapsed);
       state.lastMatchSummary = matchSummary;
+      // Phase C：派发 match_end 心跳，让服务端见证状态机收尾（推导 playerWon）。
+      emitPveWitness('match_end', { playerWon: Boolean(matchSummary.playerWon) });
       if (!winner) {
         matchTitle.textContent = '比赛结束';
       } else {
@@ -9694,6 +10326,13 @@
       if (mobileDashBtn) {
         mobileDashBtn.disabled = !isPlaying || !player || dashCooldown > 0;
         mobileDashBtn.textContent = dashCooldown > 0.05 ? `闪避 ${dashCooldown.toFixed(1)}s` : '闪避';
+        const dashOverlay = mobileDashBtn.querySelector('.mobileCooldownOverlay');
+        if (dashOverlay && dashCooldown > 0) {
+          const pct = Math.min(100, (dashCooldown / (player?.dashCooldown || CONFIG.movement.dashCooldown)) * 100);
+          dashOverlay.style.setProperty('--cd-pct', `${100 - pct}%`);
+        } else if (dashOverlay) {
+          dashOverlay.style.setProperty('--cd-pct', '0%');
+        }
       }
 
       if (mobileWeaponBtn) {
@@ -9717,6 +10356,14 @@
           mobileGrenadeBtn.textContent = grenadeCooldown > 0.05
             ? `手雷 ${grenadeCooldown.toFixed(1)}s`
             : `手雷 ${grenadeAmmo}`;
+        }
+        const grenadeOverlay = mobileGrenadeBtn.querySelector('.mobileCooldownOverlay');
+        if (grenadeOverlay && grenadeCooldown > 0) {
+          const maxCd = CONFIG?.grenade?.cooldown || 3.2;
+          const pct = Math.min(100, (grenadeCooldown / maxCd) * 100);
+          grenadeOverlay.style.setProperty('--cd-pct', `${100 - pct}%`);
+        } else if (grenadeOverlay) {
+          grenadeOverlay.style.setProperty('--cd-pct', '0%');
         }
       }
 
@@ -10077,6 +10724,19 @@
       if (state.viewMode === 'fps') {
         const player = getPlayer();
         if (!player) return;
+
+        // 移动端视野惯性衰减
+        if (mobileState.active && !mobileState.orientationBlocked) {
+          const INERTIA_DECAY = 0.82;
+          const INERTIA_THRESHOLD = 0.3;
+          if (Math.abs(mobileState.lookInertiaX) > INERTIA_THRESHOLD || Math.abs(mobileState.lookInertiaY) > INERTIA_THRESHOLD) {
+            applyFpsLookInput(mobileState.lookInertiaX, mobileState.lookInertiaY, 'touch');
+          }
+          mobileState.lookInertiaX *= INERTIA_DECAY;
+          mobileState.lookInertiaY *= INERTIA_DECAY;
+          if (Math.abs(mobileState.lookInertiaX) < INERTIA_THRESHOLD) mobileState.lookInertiaX = 0;
+          if (Math.abs(mobileState.lookInertiaY) < INERTIA_THRESHOLD) mobileState.lookInertiaY = 0;
+        }
 
         const eyeHeight = CONFIG.camera.fps.eyeHeight;
         const yaw = player.yaw;

@@ -1,9 +1,11 @@
 import { createReadStream, createWriteStream } from 'node:fs';
 import { promises as fs } from 'node:fs';
 import { createServer } from 'node:http';
+import { execFile } from 'node:child_process';
 import { createHmac, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
 import path from 'node:path';
 import { pipeline } from 'node:stream/promises';
+import { promisify } from 'node:util';
 import { createGzip, gunzipSync } from 'node:zlib';
 
 import { createPvpService, normalizePvpConfig } from './pvp.mjs';
@@ -20,7 +22,17 @@ const LEGACY_PVP_CODE_POOL = 'pvp';
 const DEFAULT_PVP_DUEL_CODE_POOL = 'pvp_duel';
 const DEFAULT_PVP_DEATHMATCH_CODE_POOL = 'pvp_deathmatch';
 const DEFAULT_REWARD_LIMIT_TIME_ZONE = 'Asia/Shanghai';
-const MIN_REWARDABLE_MATCH_SECONDS = 15;
+const DEFAULT_NEWAPI_QUOTA_PER_UNIT = 500000;
+const DEFAULT_NEWAPI_CURRENCY_SYMBOL = 'LDC';
+const MIN_REWARDABLE_MATCH_SECONDS = Math.max(1, Number.parseInt(process.env.MIN_REWARDABLE_MATCH_SECONDS ?? '15', 10) || 15);
+const REWARD_DELIVERY_BACKENDS = new Set(['cdk', 'newapi']);
+const REWARD_DELIVERY_STATUSES = new Set([
+  'ready',
+  'delivered',
+  'awaiting_newapi_account',
+  'delivery_failed',
+  'delivery_unavailable'
+]);
 const REWARD_POOLS = new Set([
   'pve',
   LEGACY_PVP_CODE_POOL,
@@ -38,6 +50,18 @@ const DEFAULT_DAILY_REWARD_LIMITS = Object.freeze({
   }),
   pvp: Object.freeze({
     default: 10
+  })
+});
+const DEFAULT_NEWAPI_REWARD_AMOUNTS = Object.freeze({
+  pve: Object.freeze({
+    novice: 0,
+    easy: 0,
+    normal: 1_000_000,
+    hard: 1_500_000
+  }),
+  pvp: Object.freeze({
+    duel: 1_500_000,
+    deathmatch: 2_000_000
   })
 });
 const DEFAULT_PVP_EVENT_SLUG = '42-cup';
@@ -83,6 +107,8 @@ const MIME_TYPES = {
   '.png': 'image/png',
   '.svg': 'image/svg+xml; charset=utf-8'
 };
+
+const execFileAsync = promisify(execFile);
 
 function inferRewardPoolFromValue(value) {
   const normalized = String(value || '')
@@ -417,6 +443,166 @@ function normalizeRewardPolicyConfig(input) {
   };
 }
 
+function normalizeRewardDeliveryBackend(value, fallback = 'newapi') {
+  const normalized = String(value || '')
+    .trim()
+    .toLowerCase();
+
+  if (REWARD_DELIVERY_BACKENDS.has(normalized)) {
+    return normalized;
+  }
+
+  return fallback;
+}
+
+function normalizeRewardDeliveryStatus(value, fallback = null) {
+  const normalized = String(value || '')
+    .trim()
+    .toLowerCase();
+
+  if (REWARD_DELIVERY_STATUSES.has(normalized)) {
+    return normalized;
+  }
+
+  return fallback;
+}
+
+function normalizeRewardDeliveryAmountsConfig(input) {
+  const source = input && typeof input === 'object' ? input : {};
+  const pve = source.pve && typeof source.pve === 'object' ? source.pve : {};
+  const pvp = source.pvp && typeof source.pvp === 'object' ? source.pvp : {};
+
+  return {
+    pve: {
+      novice: normalizeNonNegativeInteger(pve.novice, DEFAULT_NEWAPI_REWARD_AMOUNTS.pve.novice),
+      easy: normalizeNonNegativeInteger(pve.easy, DEFAULT_NEWAPI_REWARD_AMOUNTS.pve.easy),
+      normal: normalizeNonNegativeInteger(pve.normal, DEFAULT_NEWAPI_REWARD_AMOUNTS.pve.normal),
+      hard: normalizeNonNegativeInteger(pve.hard, DEFAULT_NEWAPI_REWARD_AMOUNTS.pve.hard)
+    },
+    pvp: {
+      duel: normalizeNonNegativeInteger(pvp.duel, DEFAULT_NEWAPI_REWARD_AMOUNTS.pvp.duel),
+      deathmatch: normalizeNonNegativeInteger(pvp.deathmatch, DEFAULT_NEWAPI_REWARD_AMOUNTS.pvp.deathmatch)
+    }
+  };
+}
+
+function normalizeRewardDeliveryConfig(input) {
+  const source = input && typeof input === 'object' ? input : {};
+  const newapi = source.newapi && typeof source.newapi === 'object' ? source.newapi : {};
+
+  return {
+    backend: normalizeRewardDeliveryBackend(source.backend, 'newapi'),
+    claimMode: 'manual',
+    newapi: {
+      quotaPerUnit:
+        normalizeNonNegativeInteger(newapi.quotaPerUnit, DEFAULT_NEWAPI_QUOTA_PER_UNIT) ||
+        DEFAULT_NEWAPI_QUOTA_PER_UNIT,
+      currencySymbol: normalizeShortText(
+        newapi.currencySymbol,
+        DEFAULT_NEWAPI_CURRENCY_SYMBOL,
+        16
+      ),
+      amounts: normalizeRewardDeliveryAmountsConfig(newapi.amounts)
+    }
+  };
+}
+
+function getRewardCreditAmountQuota(summary, rewardDelivery) {
+  if (normalizeRewardDeliveryBackend(rewardDelivery?.backend, 'newapi') !== 'newapi') {
+    return 0;
+  }
+
+  const amounts = normalizeRewardDeliveryConfig(rewardDelivery).newapi.amounts;
+  const pool = getRewardPoolFamily(summary?.rewardPool || summary?.matchType || summary?.codePool || summary?.gameMode);
+
+  if (pool === 'pvp') {
+    const mode = normalizeGameMode(summary?.gameMode, 'duel');
+    return normalizeNonNegativeInteger(amounts.pvp?.[mode], 0);
+  }
+
+  const difficulty = getRewardDifficultyKey(summary?.difficulty);
+  return normalizeNonNegativeInteger(amounts.pve?.[difficulty], 0);
+}
+
+function formatCreditAmountLabel(quota, rewardDelivery) {
+  const normalizedQuota = normalizeNonNegativeInteger(quota, 0);
+  if (normalizedQuota <= 0) {
+    return '0';
+  }
+
+  const config = normalizeRewardDeliveryConfig(rewardDelivery);
+  const quotaPerUnit =
+    normalizeNonNegativeInteger(config.newapi?.quotaPerUnit, DEFAULT_NEWAPI_QUOTA_PER_UNIT) ||
+    DEFAULT_NEWAPI_QUOTA_PER_UNIT;
+  const currencySymbol = config.newapi?.currencySymbol || DEFAULT_NEWAPI_CURRENCY_SYMBOL;
+  const units = normalizedQuota / quotaPerUnit;
+  const formattedUnits = Number.isInteger(units)
+    ? String(units)
+    : units.toFixed(units >= 10 ? 1 : 2).replace(/\.0+$/u, '').replace(/(\.\d*[1-9])0+$/u, '$1');
+
+  return `${formattedUnits} ${currencySymbol}`;
+}
+
+function normalizeNewApiVisibleTopupConfig(input) {
+  const source = input && typeof input === 'object' ? input : {};
+
+  return {
+    mysqlContainer: normalizeShortText(
+      source.mysqlContainer ?? process.env.NEWAPI_TOPUP_MYSQL_CONTAINER,
+      '',
+      160
+    ),
+    database: normalizeShortText(source.database ?? process.env.NEWAPI_TOPUP_DB_NAME, '', 160),
+    user: normalizeShortText(source.user ?? process.env.NEWAPI_TOPUP_DB_USER, '', 80),
+    password: String(source.password ?? process.env.NEWAPI_TOPUP_DB_PASSWORD ?? ''),
+    paymentMethod: normalizeShortText(
+      source.paymentMethod ?? process.env.NEWAPI_TOPUP_PAYMENT_METHOD,
+      'Game Reward',
+      80
+    ),
+    paymentProvider: normalizeShortText(
+      source.paymentProvider ?? process.env.NEWAPI_TOPUP_PAYMENT_PROVIDER,
+      'shooters-main',
+      80
+    )
+  };
+}
+
+function isNewApiVisibleTopupConfigured(config) {
+  return Boolean(config?.mysqlContainer && config?.database && config?.user && config?.password);
+}
+
+function escapeSqlString(value) {
+  return String(value || '')
+    .replace(/\\/gu, '\\\\')
+    .replace(/'/gu, "\\'");
+}
+
+function buildNewApiVisibleTopupTradeNo(userId, createdAtSeconds) {
+  const normalizedUserId = String(userId || '').replace(/\D+/gu, '') || '0';
+  const randomSuffix =
+    randomBytes(4)
+      .toString('base64url')
+      .replace(/[^A-Za-z0-9]/gu, '')
+      .slice(0, 6) || randomUUID().replace(/-/gu, '').slice(0, 6);
+
+  return `SHG${normalizedUserId}NO${randomSuffix}${createdAtSeconds}`.slice(0, 255);
+}
+
+function getNewApiVisibleTopupAmountUnits(quota, rewardDelivery) {
+  const normalizedQuota = normalizeNonNegativeInteger(quota, 0);
+  if (normalizedQuota <= 0) {
+    return 0;
+  }
+
+  const config = normalizeRewardDeliveryConfig(rewardDelivery);
+  const quotaPerUnit =
+    normalizeNonNegativeInteger(config.newapi?.quotaPerUnit, DEFAULT_NEWAPI_QUOTA_PER_UNIT) ||
+    DEFAULT_NEWAPI_QUOTA_PER_UNIT;
+
+  return Math.max(1, Math.ceil(normalizedQuota / quotaPerUnit));
+}
+
 function getRewardDayKey(value, timeZone = DEFAULT_REWARD_LIMIT_TIME_ZONE) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) {
@@ -480,6 +666,47 @@ function getRewardDifficultyKey(value, fallback = 'default') {
   return normalizeDifficulty(value, fallback) || fallback;
 }
 
+function getClaimedRewardEntries(store) {
+  if (Array.isArray(store?.matches)) {
+    return store.matches.filter((entry) => entry?.rewardStatus === 'claimed');
+  }
+
+  if (Array.isArray(store?.cdks)) {
+    return store.cdks.filter((entry) => entry?.status === 'assigned');
+  }
+
+  return [];
+}
+
+function getRewardEntryUserKey(entry) {
+  if (entry?.claimedBy?.key) {
+    return String(entry.claimedBy.key);
+  }
+
+  if (entry?.user?.id !== undefined && entry?.user?.id !== null && entry?.user?.id !== '') {
+    return getUserKey({ id: String(entry.user.id) });
+  }
+
+  return '';
+}
+
+function getRewardEntryPool(entry) {
+  return normalizeRewardPool(
+    entry?.pool ||
+      entry?.summary?.codePool ||
+      entry?.summary?.rewardPool ||
+      entry?.summary?.matchType
+  );
+}
+
+function getRewardEntryDifficulty(entry) {
+  return getRewardDifficultyKey(entry?.summary?.difficulty || entry?.claimContext?.summary?.difficulty);
+}
+
+function getRewardEntryClaimedAt(entry) {
+  return entry?.creditedAt || entry?.claimedAt || entry?.rewardPreparedAt || entry?.completedAt || entry?.recordedAt || null;
+}
+
 function getUserDailyClaimSummary(store, userKey, rewardPolicy, nowIso = new Date().toISOString()) {
   const timeZone = rewardPolicy?.timeZone || DEFAULT_REWARD_LIMIT_TIME_ZONE;
   const dayKey = getRewardDayKey(nowIso, timeZone);
@@ -489,12 +716,12 @@ function getUserDailyClaimSummary(store, userKey, rewardPolicy, nowIso = new Dat
     return summary;
   }
 
-  for (const entry of Array.isArray(store?.cdks) ? store.cdks : []) {
-    if (entry?.claimedBy?.key !== userKey) continue;
-    if (getRewardDayKey(entry?.claimedAt, timeZone) !== dayKey) continue;
+  for (const entry of getClaimedRewardEntries(store)) {
+    if (getRewardEntryUserKey(entry) !== userKey) continue;
+    if (getRewardDayKey(getRewardEntryClaimedAt(entry), timeZone) !== dayKey) continue;
 
-    const pool = getRewardPoolFamily(entry?.pool);
-    const difficultyKey = getRewardDifficultyKey(entry?.claimContext?.summary?.difficulty);
+    const pool = getRewardPoolFamily(getRewardEntryPool(entry));
+    const difficultyKey = getRewardEntryDifficulty(entry);
     summary.total += 1;
     summary.byPool[pool].total += 1;
     summary.byPool[pool].difficulties[difficultyKey] += 1;
@@ -657,13 +884,11 @@ function getAvailableCounts(store) {
 }
 
 function getUserClaimSummary(store, userKey) {
-  const items = Array.isArray(store?.cdks)
-    ? store.cdks.filter((entry) => entry?.claimedBy?.key === userKey)
-    : [];
+  const items = getClaimedRewardEntries(store).filter((entry) => getRewardEntryUserKey(entry) === userKey);
 
   return {
     total: items.length,
-    byPool: countByRewardPoolFamily(items)
+    byPool: countByRewardPoolFamily(items.map((entry) => ({ ...entry, pool: getRewardEntryPool(entry) })))
   };
 }
 
@@ -797,7 +1022,7 @@ function verifyPvpEdgeAccessToken(token, secret, nowMs = Date.now()) {
     user: {
       id: String(user.id),
       username: String(user.username),
-      displayName: String(user.displayName || user.username),
+      displayName: String(user.username || user.displayName),
       avatarUrl: user.avatarUrl || null
     }
   };
@@ -902,7 +1127,15 @@ async function writeJsonFile(filePath, value) {
   const tempPath = `${filePath}.${randomBytes(6).toString('hex')}.tmp`;
   await fs.mkdir(path.dirname(filePath), { recursive: true });
   await fs.writeFile(tempPath, `${JSON.stringify(value, null, 2)}\n`, 'utf8');
-  await fs.rename(tempPath, filePath);
+  try {
+    await fs.rename(tempPath, filePath);
+  } catch (error) {
+    if (!error || !['EPERM', 'EBUSY', 'EACCES'].includes(error.code)) {
+      throw error;
+    }
+    await fs.copyFile(tempPath, filePath);
+    await fs.unlink(tempPath).catch(() => {});
+  }
 }
 
 function createReplayDateParts(value) {
@@ -1035,13 +1268,7 @@ function normalizeLinuxDoProfile(profile) {
   }
 
   const resolvedUsername = String(username || `user-${rawId}`);
-  const displayName = String(
-    nestedUser.name ??
-      source.name ??
-      nestedUser.nickname ??
-      source.nickname ??
-      resolvedUsername
-  );
+  const displayName = resolvedUsername;
 
   return {
     id: String(rawId || resolvedUsername),
@@ -1064,11 +1291,71 @@ function getUserKey(user) {
   return `linuxdo:${user.id}`;
 }
 
+// --- 速率限制（Phase A 止血）--------------------------------------------------
+// 单进程内存固定窗口限流器，用于抬高脚本刷奖成本。单实例部署足够。
+// 每个 createApp() 实例持有自己的 windows Map，测试间天然隔离。
+// 返回的 enforce() 在鉴权 *之后* 调用（需要 userKey），按 endpoint 配置的
+// {user窗口, ip窗口} 双维度检查；超限返回 429 并写 Retry-After。
+function createRateLimiter() {
+  const windows = new Map(); // key`${scope}:${id}:${endpoint}` -> {count, windowStart}
+
+  function check(scope, id, endpoint, limit, perWindowMs, nowMs) {
+    const key = `${scope}:${id}:${endpoint}`;
+    const entry = windows.get(key);
+    if (!entry || nowMs - entry.windowStart >= perWindowMs) {
+      windows.set(key, { count: 1, windowStart: nowMs });
+      return { allowed: true, remaining: limit - 1 };
+    }
+    entry.count += 1;
+    const remaining = limit - entry.count;
+    return { allowed: entry.count <= limit, remaining: Math.max(remaining, 0) };
+  }
+
+  // 定期清理过期窗口，防止内存无限增长（被动清理，每次 enforce 顺带）。
+  function gc(nowMs, perWindowMs) {
+    if (windows.size < 4096) return;
+    for (const [k, entry] of windows) {
+      if (nowMs - entry.windowStart >= perWindowMs * 4) windows.delete(k);
+    }
+  }
+
+  // limits: { endpoint: { perUser, perUserWindowMs, perIp, perIpWindowMs } }
+  // clientIp: 字符串；userKey: 字符串或 null（未登录时仅走 IP）
+  // 返回 null 表示放行，或 { retryAfterMs } 表示拒绝。
+  function enforce(endpoint, limits, clientIp, userKey, nowMs) {
+    gc(nowMs, 60_000);
+    const cfg = limits[endpoint];
+    if (!cfg) return null;
+
+    if (userKey && cfg.perUser) {
+      const r = check('u', userKey, endpoint, cfg.perUser, cfg.perUserWindowMs || 60_000, nowMs);
+      if (!r.allowed) {
+        return { retryAfterMs: cfg.perUserWindowMs || 60_000 };
+      }
+    }
+    if (clientIp && cfg.perIp) {
+      const r = check('i', clientIp, endpoint, cfg.perIp, cfg.perIpWindowMs || 60_000, nowMs);
+      if (!r.allowed) {
+        return { retryAfterMs: cfg.perIpWindowMs || 60_000 };
+      }
+    }
+    return null;
+  }
+
+  return { enforce, _windows: windows };
+}
+
+function getClientIp(req) {
+  const fwd = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim();
+  if (fwd) return fwd;
+  return req.socket?.remoteAddress || req.connection?.remoteAddress || '';
+}
+
 function summarizeUser(user) {
   return {
     id: user.id,
     username: user.username,
-    displayName: user.displayName,
+    displayName: user.username || user.displayName || user.id,
     avatarUrl: user.avatarUrl || null
   };
 }
@@ -1083,7 +1370,7 @@ function normalizeStoredUser(input) {
   return summarizeUser({
     id: String(id),
     username: String(source.username || ''),
-    displayName: String(source.displayName || source.username || source.id || id),
+    displayName: String(source.username || source.displayName || source.id || id),
     avatarUrl: source.avatarUrl || null
   });
 }
@@ -1100,6 +1387,51 @@ function summarizeCdk(item) {
     claimedAt: item.claimedAt || null,
     claimedBy: item.claimedBy || null,
     claimContext: item.claimContext || null
+  };
+}
+
+function summarizeRewardClaimFromMatchRecord(item, rewardDelivery = null) {
+  if (!item) {
+    return null;
+  }
+
+  const rewardBackend = normalizeRewardDeliveryBackend(
+    item.rewardBackend,
+    'cdk'
+  );
+  const creditAmountQuota = normalizeNonNegativeInteger(item.creditAmountQuota, 0);
+  const claimContext = {
+    awardId: item.id || null,
+    matchTicketId: item.ticketId || null,
+    preparedAt: item.rewardPreparedAt || null,
+    summary: item.summary || null
+  };
+
+  return {
+    id: item.id || null,
+    code: item.assignedCode || null,
+    pool: normalizeRewardPool(item.pool || item.summary?.codePool || item.summary?.rewardPool || DEFAULT_REWARD_POOL),
+    claimedAt: item.claimedAt || null,
+    creditedAt: item.creditedAt || item.claimedAt || null,
+    rewardBackend,
+    deliveryStatus: normalizeRewardDeliveryStatus(
+      item.deliveryStatus,
+      item.rewardStatus === 'claimed' ? 'delivered' : null
+    ),
+    creditAmountQuota,
+    creditAmountLabel:
+      item.creditAmountLabel ||
+      (rewardBackend === 'newapi' && creditAmountQuota > 0
+        ? formatCreditAmountLabel(creditAmountQuota, rewardDelivery)
+        : null),
+    topupTradeNo: normalizeShortText(item.topupTradeNo, '', 255) || null,
+    topupAmount: normalizeNonNegativeInteger(item.topupAmount, 0),
+    topupMoney: Number.isFinite(Number(item.topupMoney)) ? Number(item.topupMoney) : 0,
+    topupPaymentMethod: normalizeShortText(item.topupPaymentMethod, '', 80) || null,
+    topupPaymentProvider: normalizeShortText(item.topupPaymentProvider, '', 80) || null,
+    newapiUserId: item.newapiUserId ? String(item.newapiUserId) : null,
+    deliveryError: item.deliveryError || null,
+    claimContext
   };
 }
 
@@ -1209,9 +1541,11 @@ function mergeReplayPlayerDirectory(metaPlayers, resultStats, matchRecords) {
           ? String(entry.username)
           : previous.username || '',
       displayName:
-        entry?.displayName !== undefined && entry?.displayName !== null && entry?.displayName !== ''
-          ? String(entry.displayName)
-          : previous.displayName || previous.username || key,
+        entry?.username !== undefined && entry?.username !== null && entry?.username !== ''
+          ? String(entry.username)
+          : entry?.displayName !== undefined && entry?.displayName !== null && entry?.displayName !== ''
+            ? String(entry.displayName)
+            : previous.username || previous.displayName || key,
       team:
         entry?.team !== undefined && entry?.team !== null && entry?.team !== ''
           ? String(entry.team)
@@ -1396,8 +1730,8 @@ function buildReplayDetailPayload(replay, matchRecords) {
   const normalizedRecords = matchRecords
     .map((record) => summarizeMatchRecord(record))
     .sort((left, right) =>
-      String(left.user?.displayName || left.user?.username || left.user?.id || '').localeCompare(
-        String(right.user?.displayName || right.user?.username || right.user?.id || '')
+      String(left.user?.username || left.user?.displayName || left.user?.id || '').localeCompare(
+        String(right.user?.username || right.user?.displayName || right.user?.id || '')
       )
     );
   const replaySummary = summarizeReplayRecord(replay);
@@ -1797,6 +2131,13 @@ function buildPlayerReplayListPayload(matchStore, signupStore, eventConfig, user
 }
 
 function summarizeMatchRecord(item) {
+  const rewardBackend = normalizeRewardDeliveryBackend(
+    item.rewardBackend,
+    'cdk'
+  );
+  const creditAmountQuota = normalizeNonNegativeInteger(item.creditAmountQuota, 0);
+  const claimedAt = item.claimedAt || null;
+
   return {
     id: item.id,
     ticketId: item.ticketId,
@@ -1808,8 +2149,27 @@ function summarizeMatchRecord(item) {
     summary: sanitizeAwardSummary(item.summary || null),
     rewardStatus: typeof item.rewardStatus === 'string' ? item.rewardStatus : 'not_eligible',
     rewardPreparedAt: item.rewardPreparedAt || null,
-    claimedAt: item.claimedAt || null,
+    claimedAt,
+    creditedAt: item.creditedAt || claimedAt || null,
     assignedCode: item.assignedCode || null,
+    rewardBackend,
+    deliveryStatus: normalizeRewardDeliveryStatus(
+      item.deliveryStatus,
+      item.rewardStatus === 'claimed' ? 'delivered' : item.rewardStatus === 'ready' ? 'ready' : null
+    ),
+    creditAmountQuota,
+    creditAmountLabel:
+      item.creditAmountLabel ||
+      (rewardBackend === 'newapi' && creditAmountQuota > 0
+        ? formatCreditAmountLabel(creditAmountQuota, normalizeRewardDeliveryConfig())
+        : null),
+    topupTradeNo: normalizeShortText(item.topupTradeNo, '', 255) || null,
+    topupAmount: normalizeNonNegativeInteger(item.topupAmount, 0),
+    topupMoney: Number.isFinite(Number(item.topupMoney)) ? Number(item.topupMoney) : 0,
+    topupPaymentMethod: normalizeShortText(item.topupPaymentMethod, '', 80) || null,
+    topupPaymentProvider: normalizeShortText(item.topupPaymentProvider, '', 80) || null,
+    newapiUserId: item.newapiUserId ? String(item.newapiUserId) : null,
+    deliveryError: normalizeShortText(item.deliveryError, '', 280) || null,
     replay: summarizeReplayRecord(item.replay || null)
   };
 }
@@ -2105,6 +2465,152 @@ function resolveAwardBlockReason(summary) {
   return null;
 }
 
+// --- PVE 见证状态机（Phase C）------------------------------------------------
+// 见证模型：PVE 是单机，服务端无法推演战斗。改为让客户端在对局中增量上报
+// 心跳事件（kill/damage/match_end），服务端累计并校验，结算时用「服务端累计的
+// 统计 + 服务端墙钟时长」作为领奖依据，而非客户端 endMatch 自报。
+// 见 docs/plans/2026-06-23-reward-anti-farm-design.md §2.2。
+//
+// witness 随 session 内存存活（单实例部署足够）。tainted 一律拒绝发奖。
+const PVE_EVENT_TYPES = new Set(['kill', 'damage', 'round_won', 'round_lost', 'match_end']);
+const PVE_EVENT_BURST_WINDOW_MS = 200; // 同 ticket 200ms 内最多 burstLimit 条
+const PVE_EVENT_BURST_LIMIT = 6;
+const PVE_MAX_SINGLE_DAMAGE = 500; // 单次伤害合理性上限（AI 武器单发远低于此）
+
+function createWitnessState() {
+  return {
+    witnessedKills: 0,
+    witnessedDeaths: 0,
+    witnessedDamage: 0,
+    roundsWon: 0,
+    roundsLost: 0,
+    playerWon: null, // 由 match_end 推导
+    eventCount: 0,
+    maxSeq: 0,
+    firstEventAt: null, // 服务端墙钟（ms），用于结算时长
+    lastEventAt: null,
+    tainted: false,
+    taintReason: null
+  };
+}
+
+function markTainted(witness, reason) {
+  witness.tainted = true;
+  if (!witness.taintReason) witness.taintReason = reason;
+}
+
+// 摄入一条心跳事件。返回 { ok, error } —— ok=false 时 error 为拒绝原因。
+// nowMs: 服务端墙钟毫秒（与 createApp 的 now() 同源）。
+function ingestWitnessEvent(witness, event, nowMs) {
+  if (!event || typeof event !== 'object') return { ok: false, error: 'invalid_event' };
+
+  const seq = Number(event.seq);
+  if (!Number.isInteger(seq) || seq !== witness.maxSeq + 1) {
+    markTainted(witness, 'event_out_of_order');
+    return { ok: false, error: 'event_out_of_order' };
+  }
+
+  const type = String(event.type || '');
+  if (!PVE_EVENT_TYPES.has(type)) {
+    return { ok: false, error: 'invalid_event_type' };
+  }
+
+  // 速率：同 ticket 在 burst 窗口内不能超过 burstLimit，否则标 tainted
+  if (
+    witness.lastEventAt &&
+    nowMs - witness.lastEventAt < PVE_EVENT_BURST_WINDOW_MS &&
+    witness.eventCount > 0 &&
+    (witness.eventCount % PVE_EVENT_BURST_LIMIT) === 0
+  ) {
+    // 仅在已达 burst 上限时触发：检查最近窗口内是否过密
+    markTainted(witness, 'event_rate_limited');
+    return { ok: false, error: 'event_rate_limited' };
+  }
+
+  const payload = (event.payload && typeof event.payload === 'object') ? event.payload : {};
+
+  if (type === 'kill') {
+    const kills = Math.max(0, Math.floor(Number(payload.kills) || 0));
+    if (kills > 50) {
+      markTainted(witness, 'unreasonable_kills');
+      return { ok: false, error: 'unreasonable_kills' };
+    }
+    witness.witnessedKills += kills;
+    if (payload.deaths !== undefined) {
+      witness.witnessedDeaths += Math.max(0, Math.floor(Number(payload.deaths) || 0));
+    }
+  } else if (type === 'damage') {
+    const amount = Number(payload.amount);
+    if (!Number.isFinite(amount) || amount < 0 || amount > PVE_MAX_SINGLE_DAMAGE) {
+      markTainted(witness, 'unreasonable_damage');
+      return { ok: false, error: 'unreasonable_damage' };
+    }
+    witness.witnessedDamage += amount;
+  } else if (type === 'round_won') {
+    witness.roundsWon += 1;
+  } else if (type === 'round_lost') {
+    witness.roundsLost += 1;
+    if (payload.deaths !== undefined) {
+      witness.witnessedDeaths += Math.max(0, Math.floor(Number(payload.deaths) || 0));
+    }
+  } else if (type === 'match_end') {
+    witness.playerWon = Boolean(payload.playerWon);
+  }
+
+  witness.maxSeq = seq;
+  witness.eventCount += 1;
+  if (witness.firstEventAt === null) witness.firstEventAt = nowMs;
+  witness.lastEventAt = nowMs;
+  return { ok: true };
+}
+
+// 见证是否「完整」（足以作为发奖证据）：至少有一条事件，且收到了 match_end。
+function isWitnessComplete(witness) {
+  return Boolean(witness && witness.eventCount > 0 && witness.playerWon !== null);
+}
+
+// 用见证数据覆盖 summary 的领奖关键字段。返回新 summary（不 mutate 原对象以外状态）。
+// serverObservedDuration: 服务端墙钟差（秒），由 prepare 调用方算好传入。
+function buildWitnessedSummary(witness, baseSummary, serverObservedDuration) {
+  const won = witness.playerWon === true;
+  const summary = {
+    ...baseSummary,
+    playerWon: won,
+    playerIsMvp: true, // PVE 单人即 MVP
+    winnerTeam: won ? 'p1' : 'p2',
+    playerTeam: 'p1',
+    matchDurationSeconds: serverObservedDuration,
+    playerStats: {
+      kills: witness.witnessedKills,
+      deaths: witness.witnessedDeaths,
+      damageDealt: Math.round(witness.witnessedDamage)
+    },
+    awardSource: 'pve_witnessed'
+  };
+
+  // eligible 由「见证完整 + 未 tainted + 胜」决定；resolveAwardBlockReason 复核时长/击杀
+  let eligible = isWitnessComplete(witness) && !witness.tainted && won;
+  let blockReason = null;
+  if (!eligible && !witness.tainted) {
+    blockReason = !isWitnessComplete(witness) ? 'witness_incomplete' : (won ? null : 'player_lost');
+  } else if (witness.tainted) {
+    blockReason = witness.taintReason || 'server_verification_required';
+  }
+  if (eligible) {
+    const durReason =
+      Number.isFinite(serverObservedDuration) && serverObservedDuration < MIN_REWARDABLE_MATCH_SECONDS
+        ? 'match_too_short'
+        : null;
+    if (durReason) {
+      eligible = false;
+      blockReason = durReason;
+    }
+  }
+  summary.eligibleForAward = eligible;
+  if (blockReason) summary.awardBlockedReason = blockReason;
+  return summary;
+}
+
 function summarizePendingAward(award) {
   if (!award) return null;
 
@@ -2317,6 +2823,27 @@ export function createApp(options = {}) {
     parseBooleanFlag(process.env.ALLOW_CLIENT_REPORTED_AWARDS, false);
   const awardSecurity = buildAwardSecurityState(allowClientReportedAwards);
 
+  // Phase A 止血：奖励链路端点速率限制。固定窗口、单进程内存。
+  // 阈值取自 docs/plans/2026-06-23-reward-anti-farm-design.md §2.3，
+  // 兼顾正常玩家（手动对局节奏远低于此）与脚本刷奖（动辄秒级循环）。
+  // options.rateLimit === false 时整体关闭（仅供测试压力场景使用）。
+  const rateLimitEnabled = options.rateLimit !== false;
+  const rateLimiter = createRateLimiter();
+  const REWARD_RATE_LIMITS = {
+    // POST /api/awards/matches/start —— 防快速刷 ticket
+    '/api/awards/matches/start': { perUser: 6, perUserWindowMs: 30_000, perIp: 20, perIpWindowMs: 60_000 },
+    // POST /api/awards/prepare
+    '/api/awards/prepare': { perUser: 6, perUserWindowMs: 15_000, perIp: 30, perIpWindowMs: 60_000 },
+    // POST /api/cdks/claim
+    '/api/cdks/claim': { perUser: 6, perUserWindowMs: 10_000, perIp: 30, perIpWindowMs: 60_000 }
+  };
+  // 统一别名：旧路由 /api/rewards/claim 与 /api/match/*-award 也纳入同一限流桶
+  const RATE_LIMIT_ALIAS = {
+    '/api/rewards/claim': '/api/cdks/claim',
+    '/api/match/start-award': '/api/awards/matches/start',
+    '/api/match/prepare-award': '/api/awards/prepare'
+  };
+
   const oauthConfig = {
     authorizeEndpoint:
       options.linuxDo?.authorizeEndpoint ||
@@ -2350,19 +2877,126 @@ export function createApp(options = {}) {
     allowedOrigins: normalizeOrigins(
       options.pvpEdge?.allowedOrigins ||
         process.env.PVP_EDGE_ALLOWED_ORIGINS ||
-        oauthConfig.baseUrl ||
-        process.env.BASE_URL ||
-        ''
+      oauthConfig.baseUrl ||
+      process.env.BASE_URL ||
+      ''
     )
   };
+  const newapiConfig = {
+    baseUrl: cleanBaseUrl(options.newapi?.baseUrl || process.env.NEWAPI_BASE_URL || ''),
+    adminAccessToken: String(
+      options.newapi?.adminAccessToken || process.env.NEWAPI_ADMIN_ACCESS_TOKEN || ''
+    ).trim(),
+    adminUserId: String(options.newapi?.adminUserId || process.env.NEWAPI_ADMIN_USER_ID || '').trim()
+  };
+  const newapiVisibleTopupConfig = normalizeNewApiVisibleTopupConfig(
+    options.newapi?.visibleTopup || options.newapi?.topup || {}
+  );
+
+  async function runNewApiVisibleTopupSql(sql) {
+    const args = [
+      'exec',
+      newapiVisibleTopupConfig.mysqlContainer,
+      'mysql',
+      '--batch',
+      '--raw',
+      '--skip-column-names',
+      `-u${newapiVisibleTopupConfig.user}`,
+      `-p${newapiVisibleTopupConfig.password}`,
+      '-D',
+      newapiVisibleTopupConfig.database,
+      '-e',
+      sql
+    ];
+
+    const result = await execFileAsync('docker', args, {
+      timeout: 15_000,
+      maxBuffer: 1024 * 1024
+    });
+
+    return String(result.stdout || '');
+  }
+
+  async function creditNewApiQuotaWithVisibleTopup(matchedUser, creditAmountQuota, rewardDelivery) {
+    const normalizedQuota = normalizeNonNegativeInteger(creditAmountQuota, 0);
+    const createdAtSeconds = Math.floor(getNowMs() / 1000);
+    const creditedAt = getNowIso();
+    const tradeNo = buildNewApiVisibleTopupTradeNo(matchedUser?.id, createdAtSeconds);
+    const topupAmount = getNewApiVisibleTopupAmountUnits(normalizedQuota, rewardDelivery);
+    const topupMoney = 0;
+    const paymentMethod = newapiVisibleTopupConfig.paymentMethod || 'Game Reward';
+    const paymentProvider = newapiVisibleTopupConfig.paymentProvider || 'shooters-main';
+    const userId = normalizeNonNegativeInteger(matchedUser?.id, 0);
+
+    if (!userId || normalizedQuota <= 0 || topupAmount <= 0) {
+      const error = new Error('newapi_visible_topup_invalid_input');
+      error.code = 'newapi_visible_topup_invalid_input';
+      throw error;
+    }
+
+    const sql = [
+      'START TRANSACTION',
+      `SELECT quota FROM users WHERE id = ${userId} FOR UPDATE`,
+      `UPDATE users SET quota = quota + ${normalizedQuota} WHERE id = ${userId}`,
+      [
+        'INSERT INTO top_ups',
+        '(user_id, amount, money, trade_no, payment_method, create_time, complete_time, status, payment_provider)',
+        `SELECT ${userId}, ${topupAmount}, ${topupMoney}, '${escapeSqlString(tradeNo)}',`,
+        `'${escapeSqlString(paymentMethod)}', ${createdAtSeconds}, ${createdAtSeconds}, 'success',`,
+        `'${escapeSqlString(paymentProvider)}' FROM users WHERE id = ${userId}`
+      ].join(' '),
+      'COMMIT'
+    ].join(';\n');
+
+    const stdout = await runNewApiVisibleTopupSql(sql);
+    const previousQuotaLine = stdout
+      .split(/\r?\n/gu)
+      .map((line) => line.trim())
+      .find(Boolean);
+    const previousQuota = Number(previousQuotaLine);
+
+    if (!Number.isFinite(previousQuota)) {
+      const error = new Error('newapi_visible_topup_user_not_found');
+      error.code = 'newapi_visible_topup_user_not_found';
+      throw error;
+    }
+
+    return {
+      deliveryStatus: 'delivered',
+      deliveryError: null,
+      creditedAt,
+      newapiUserId: String(userId),
+      previousQuota,
+      nextQuota: previousQuota + normalizedQuota,
+      topupTradeNo: tradeNo,
+      topupAmount,
+      topupMoney,
+      topupPaymentMethod: paymentMethod,
+      topupPaymentProvider: paymentProvider
+    };
+  }
+
+  const newapiRewardCreditImpl =
+    typeof options.newapiRewardCreditImpl === 'function'
+      ? options.newapiRewardCreditImpl
+      : isNewApiVisibleTopupConfigured(newapiVisibleTopupConfig)
+        ? async (payload) =>
+            creditNewApiQuotaWithVisibleTopup(
+              payload.matchedUser,
+              payload.creditAmountQuota,
+              payload.rewardDelivery
+            )
+        : null;
 
   const sessions = new Map();
   const loginStates = new Map();
+  const rewardDeliveryLocks = new Map();
   const cdkFile = path.join(dataDir, 'cdks.json');
   const matchesFile = path.join(dataDir, 'matches.json');
   const appConfigFile = path.join(dataDir, 'app-config.json');
   const pvpEventSignupsFile = path.join(dataDir, 'pvp-event-signups.json');
   const pvpEventLeaderboardFile = path.join(dataDir, 'pvp-event-leaderboard.json');
+  const redeemCodesFile = path.join(dataDir, 'redeem-codes.json');
   const pvpReplaysDir = path.join(dataDir, 'pvp-replays');
   let pvpSweepTimer = null;
 
@@ -2373,6 +3007,7 @@ export function createApp(options = {}) {
       adminUsernames: [],
       adminUserIds: [],
       rewardPolicy: normalizeRewardPolicyConfig(),
+      rewardDelivery: normalizeRewardDeliveryConfig(),
       pvp: normalizePvpConfig(),
       pvpEvent: normalizePvpEventConfig()
     });
@@ -2392,6 +3027,21 @@ export function createApp(options = {}) {
       version: 1,
       snapshot: null
     });
+    await ensureJsonFile(redeemCodesFile, {
+      version: 1,
+      codes: [
+        {
+          code: '42thirdShortcakeAtLinuxdo',
+          creditAmountQuota: 2100000,
+          note: '4.2 LDC',
+          status: 'active',
+          maxClaimsPerUser: 1,
+          createdAt: null,
+          createdBy: null,
+          claims: []
+        }
+      ]
+    });
   }
 
   async function readStoredAppConfig() {
@@ -2399,6 +3049,7 @@ export function createApp(options = {}) {
       adminUsernames: [],
       adminUserIds: [],
       rewardPolicy: normalizeRewardPolicyConfig(),
+      rewardDelivery: normalizeRewardDeliveryConfig(),
       pvp: normalizePvpConfig(),
       pvpEvent: normalizePvpEventConfig()
     });
@@ -2406,7 +3057,12 @@ export function createApp(options = {}) {
     return {
       adminUsernames: Array.isArray(data.adminUsernames) ? data.adminUsernames.map(String) : [],
       adminUserIds: Array.isArray(data.adminUserIds) ? data.adminUserIds.map(String) : [],
+      bannedLinuxdoIds: Array.isArray(data.bannedLinuxdoIds)
+        ? [...new Set(data.bannedLinuxdoIds.map((item) => String(item).trim()).filter(Boolean))]
+        : [],
+      banExpiresAt: typeof data.banExpiresAt === 'string' ? data.banExpiresAt : null,
       rewardPolicy: normalizeRewardPolicyConfig(data.rewardPolicy),
+      rewardDelivery: normalizeRewardDeliveryConfig(data.rewardDelivery),
       pvp: normalizePvpConfig(data.pvp),
       pvpEvent: normalizePvpEventConfig(data.pvpEvent)
     };
@@ -2422,7 +3078,12 @@ export function createApp(options = {}) {
       adminUserIds: Array.isArray(source.adminUserIds)
         ? [...new Set(source.adminUserIds.map((item) => String(item).trim()).filter(Boolean))]
         : [],
+      bannedLinuxdoIds: Array.isArray(source.bannedLinuxdoIds)
+        ? [...new Set(source.bannedLinuxdoIds.map((item) => String(item).trim()).filter(Boolean))]
+        : [],
+      banExpiresAt: typeof source.banExpiresAt === 'string' ? source.banExpiresAt : null,
       rewardPolicy: normalizeRewardPolicyConfig(source.rewardPolicy),
+      rewardDelivery: normalizeRewardDeliveryConfig(source.rewardDelivery),
       pvp: normalizePvpConfig(source.pvp),
       pvpEvent: normalizePvpEventConfig(source.pvpEvent)
     });
@@ -2562,9 +3223,12 @@ export function createApp(options = {}) {
   async function readAppConfig() {
     const storedConfig = await readStoredAppConfig();
     const fileRewardPolicy = storedConfig.rewardPolicy;
+    const fileRewardDelivery = storedConfig.rewardDelivery;
 
     const optionPvpConfig =
       options.pvpConfig && typeof options.pvpConfig === 'object' ? options.pvpConfig : {};
+    const optionRewardDelivery =
+      options.rewardDelivery && typeof options.rewardDelivery === 'object' ? options.rewardDelivery : {};
 
     return {
       adminUsernames: [
@@ -2579,6 +3243,8 @@ export function createApp(options = {}) {
           ...storedConfig.adminUserIds
         ])
       ],
+      bannedLinuxdoIds: storedConfig.bannedLinuxdoIds || [],
+      banExpiresAt: storedConfig.banExpiresAt || null,
       rewardPolicy: normalizeRewardPolicyConfig({
         timeZone:
           options.rewardPolicy?.timeZone ??
@@ -2608,6 +3274,22 @@ export function createApp(options = {}) {
               options.rewardPolicy?.dailyLimits?.pvp?.default ??
               process.env.REWARD_LIMIT_PVP_DEFAULT ??
               fileRewardPolicy.dailyLimits?.pvp?.default
+          }
+        }
+      }),
+      rewardDelivery: normalizeRewardDeliveryConfig({
+        ...fileRewardDelivery,
+        ...optionRewardDelivery,
+        newapi: {
+          ...(fileRewardDelivery?.newapi || {}),
+          ...(optionRewardDelivery.newapi && typeof optionRewardDelivery.newapi === 'object'
+            ? optionRewardDelivery.newapi
+            : {}),
+          amounts: {
+            ...(fileRewardDelivery?.newapi?.amounts || {}),
+            ...(optionRewardDelivery.newapi?.amounts && typeof optionRewardDelivery.newapi.amounts === 'object'
+              ? optionRewardDelivery.newapi.amounts
+              : {})
           }
         }
       }),
@@ -2829,6 +3511,7 @@ export function createApp(options = {}) {
   }
 
   const pvpService = createPvpService({
+    ...(options.pvpServiceOptions && typeof options.pvpServiceOptions === 'object' ? options.pvpServiceOptions : {}),
     getNowMs,
     getNowIso,
     async getConfig() {
@@ -2913,6 +3596,92 @@ export function createApp(options = {}) {
       version: 1,
       signups: Array.isArray(store?.signups) ? store.signups.map((entry) => summarizePvpEventSignup(entry)).filter(Boolean) : []
     });
+  }
+
+  function summarizeRedeemCode(entry) {
+    if (!entry || typeof entry !== 'object') {
+      return null;
+    }
+
+    const quota = normalizeNonNegativeInteger(entry.creditAmountQuota, 0);
+    return {
+      code: String(entry.code || ''),
+      creditAmountQuota: quota,
+      note: typeof entry.note === 'string' ? entry.note.slice(0, 200) : '',
+      status: entry.status === 'disabled' ? 'disabled' : 'active',
+      maxClaimsPerUser: Math.max(1, normalizeNonNegativeInteger(entry.maxClaimsPerUser, 1)),
+      createdAt: entry.createdAt || null,
+      createdBy: entry.createdBy || null,
+      claims: Array.isArray(entry.claims)
+        ? entry.claims
+            .map((claim) =>
+              claim && typeof claim === 'object'
+                ? {
+                    userKey: String(claim.userKey || ''),
+                    claimedAt: claim.claimedAt || null,
+                    deliveryStatus: claim.deliveryStatus || 'delivered'
+                  }
+                : null
+            )
+            .filter(Boolean)
+        : []
+    };
+  }
+
+  function summarizeRedeemCodeForAdmin(entry) {
+    const summary = summarizeRedeemCode(entry);
+    if (!summary) {
+      return null;
+    }
+
+    return {
+      ...summary,
+      claimCount: summary.claims.length
+    };
+  }
+
+  async function readRedeemCodeStore() {
+    const store = await readJsonFile(redeemCodesFile, {
+      version: 1,
+      codes: []
+    });
+
+    if (!Array.isArray(store.codes)) {
+      return { version: 1, codes: [] };
+    }
+
+    return {
+      version: Math.max(Number(store.version) || 1, 1),
+      codes: store.codes.map((entry) => summarizeRedeemCode(entry)).filter((entry) => entry && entry.code)
+    };
+  }
+
+  async function writeRedeemCodeStore(store) {
+    await writeJsonFile(redeemCodesFile, {
+      version: 1,
+      codes: Array.isArray(store?.codes) ? store.codes.map((entry) => summarizeRedeemCode(entry)).filter(Boolean) : []
+    });
+  }
+
+  function findRedeemCode(store, code) {
+    const normalized = String(code || '').trim();
+    if (!normalized) {
+      return null;
+    }
+
+    return (
+      (Array.isArray(store?.codes) ? store.codes : []).find(
+        (entry) => entry && entry.code === normalized
+      ) || null
+    );
+  }
+
+  function countRedeemClaimsForUser(entry, userKey) {
+    if (!entry || !userKey) {
+      return 0;
+    }
+
+    return entry.claims.filter((claim) => claim.userKey === userKey).length;
   }
 
   function getPvpEventSignupsForConfig(store, eventConfig) {
@@ -3157,7 +3926,8 @@ export function createApp(options = {}) {
             ? {
                 id: entry.claimedBy.id,
                 username: entry.claimedBy.username,
-                displayName: entry.claimedBy.displayName,
+                displayName:
+                  entry.claimedBy.username || entry.claimedBy.displayName || entry.claimedBy.id,
                 avatarUrl: entry.claimedBy.avatarUrl || null
               }
             : null,
@@ -3172,7 +3942,12 @@ export function createApp(options = {}) {
           rewardStatus: 'claimed',
           rewardPreparedAt: context.preparedAt || null,
           claimedAt: entry.claimedAt || null,
-          assignedCode: entry.code || null
+          creditedAt: entry.claimedAt || null,
+          assignedCode: entry.code || null,
+          rewardBackend: 'cdk',
+          deliveryStatus: 'delivered',
+          creditAmountQuota: 0,
+          deliveryError: null
         })
       );
       mutated = true;
@@ -3205,6 +3980,45 @@ export function createApp(options = {}) {
     });
     store.matches.push(created);
     return created;
+  }
+
+  function findLatestClaimForUser(store, user) {
+    const userId = String(user?.id || '');
+    if (!userId || !Array.isArray(store?.matches)) {
+      return null;
+    }
+
+    return (
+      store.matches
+        .filter(
+          (entry) =>
+            entry?.rewardStatus === 'claimed' && String(entry.user?.id || '') === userId
+        )
+        .sort((left, right) =>
+          String(
+            right.creditedAt || right.claimedAt || right.completedAt || right.recordedAt || ''
+          ).localeCompare(
+            String(left.creditedAt || left.claimedAt || left.completedAt || left.recordedAt || '')
+          )
+        )[0] || null
+    );
+  }
+
+  function findClaimedMatchForUserByTicket(store, user, ticketId) {
+    const userId = String(user?.id || '');
+    const normalizedTicketId = String(ticketId || '');
+    if (!userId || !normalizedTicketId || !Array.isArray(store?.matches)) {
+      return null;
+    }
+
+    return (
+      store.matches.find(
+        (entry) =>
+          entry?.rewardStatus === 'claimed' &&
+          String(entry.ticketId || '') === normalizedTicketId &&
+          String(entry.user?.id || '') === userId
+      ) || null
+    );
   }
 
   function findLatestReadyMatchForUser(store, user) {
@@ -3269,6 +4083,103 @@ export function createApp(options = {}) {
     }
   }
 
+  function getRecentRewardClaimsForUser(matchStore, user, rewardDelivery, limit = 5) {
+    const userId = String(user?.id || '');
+    if (!userId || !Array.isArray(matchStore?.matches)) {
+      return [];
+    }
+
+    return matchStore.matches
+      .filter(
+        (entry) =>
+          entry?.rewardStatus === 'claimed' && String(entry.user?.id || '') === userId
+      )
+      .sort((left, right) =>
+        String(
+          right.creditedAt || right.claimedAt || right.completedAt || right.recordedAt || ''
+        ).localeCompare(
+          String(left.creditedAt || left.claimedAt || left.completedAt || left.recordedAt || '')
+        )
+      )
+      .slice(0, Math.max(1, limit))
+      .map((entry) => summarizeRewardClaimFromMatchRecord(entry, rewardDelivery));
+  }
+
+  function buildRewardsPayload(store, matchStore, payload, nowIso = getNowIso()) {
+    const userKey = getUserKey(payload.user);
+    const availableCounts = getAvailableCounts(store);
+    const claimSummary = getUserClaimSummary(matchStore, userKey);
+    const dailyClaimSummary = getUserDailyClaimSummary(
+      matchStore,
+      userKey,
+      payload.rewardPolicy,
+      nowIso
+    );
+    const pendingAward = summarizePendingAward(payload.session.pendingAward || null);
+    const pendingPool = getRewardPoolFamily(
+      pendingAward?.summary?.rewardPool || pendingAward?.summary?.matchType || pendingAward?.summary?.gameMode
+    );
+    const pendingCodePool = pendingAward ? getCodePoolForSummary(pendingAward.summary) : null;
+    const pendingMatchRecord =
+      pendingAward && Array.isArray(matchStore?.matches)
+        ? matchStore.matches.find(
+            (entry) =>
+              String(entry.ticketId || '') === String(pendingAward.ticketId || '') &&
+              String(entry.user?.id || '') === String(payload.user?.id || '')
+          ) || null
+        : null;
+    const pendingCreditAmountQuota = pendingAward
+      ? getRewardCreditAmountQuota(pendingAward.summary, payload.rewardDelivery)
+      : 0;
+    const pendingCreditAmountLabel =
+      pendingCreditAmountQuota > 0
+        ? formatCreditAmountLabel(pendingCreditAmountQuota, payload.rewardDelivery)
+        : null;
+    const pendingAvailableCount = pendingAward
+      ? normalizeRewardDeliveryBackend(payload.rewardDelivery?.backend, 'newapi') === 'cdk'
+        ? getCodePoolFallbacks(pendingCodePool).reduce(
+            (sum, pool) => sum + selectPoolCount(availableCounts, pool),
+            0
+          )
+        : pendingCreditAmountQuota > 0
+          ? 1
+          : 0
+      : 0;
+    const pendingLimitStatus = pendingAward
+      ? getRewardLimitStatus(pendingAward.summary, payload.rewardPolicy, dailyClaimSummary)
+      : null;
+    const recentClaims = getRecentRewardClaimsForUser(matchStore, payload.user, payload.rewardDelivery, 5);
+    const latestClaim = recentClaims[0] || null;
+
+    return {
+      latestClaim,
+      recentClaims,
+      claimCount: claimSummary.total,
+      claimCounts: claimSummary.byPool,
+      dailyClaims: dailyClaimSummary,
+      availableCount: pendingAward
+        ? pendingAvailableCount
+        : normalizeRewardDeliveryBackend(payload.rewardDelivery?.backend, 'newapi') === 'cdk'
+          ? getTotalAvailableCodeCount(availableCounts)
+          : 0,
+      availableCounts,
+      pendingPool,
+      pendingCodePool,
+      pendingAvailableCount,
+      pendingLimitStatus,
+      pendingAward,
+      rewardPolicy: payload.rewardPolicy,
+      rewardDelivery: payload.rewardDelivery,
+      rewardBackend: normalizeRewardDeliveryBackend(payload.rewardDelivery?.backend, 'newapi'),
+      deliveryStatus: pendingAward
+        ? normalizeRewardDeliveryStatus(pendingMatchRecord?.deliveryStatus, 'ready')
+        : latestClaim?.deliveryStatus || null,
+      creditAmountQuota: pendingAward ? pendingCreditAmountQuota : latestClaim?.creditAmountQuota || 0,
+      creditAmountLabel: pendingAward ? pendingCreditAmountLabel : latestClaim?.creditAmountLabel || null,
+      deliveryError: pendingAward ? pendingMatchRecord?.deliveryError || null : latestClaim?.deliveryError || null
+    };
+  }
+
   async function recordPvpMatchResult(payload) {
     const result = payload?.result;
     if (!result?.matchId || !Array.isArray(result.stats) || !result.stats.length) {
@@ -3278,11 +4189,13 @@ export function createApp(options = {}) {
     const store = await readCdkStore();
     const matchStore = await readMatchStore();
     const appConfig = await readAppConfig();
+    backfillMatchStoreFromClaims(matchStore, store);
     const startedAt = payload.startedAt || null;
     const completedAt = payload.endedAt || getNowIso();
     const mvpStat = result.stats.find((entry) => String(entry.userId) === String(result.mvpUserId)) || null;
     const replayRecord = summarizeReplayRecord(payload?.replay || null);
     const pvpRewardsEnabled = Boolean(appConfig.pvp?.rewardEnabled);
+    const rewardBackend = normalizeRewardDeliveryBackend(appConfig.rewardDelivery?.backend, 'newapi');
 
     for (const stat of result.stats) {
       const userInfo =
@@ -3301,8 +4214,8 @@ export function createApp(options = {}) {
         playerIsMvp: String(stat.userId) === String(result.mvpUserId),
         eligibleForAward: false,
         mvpTeam: mvpStat?.team || result.winnerTeam || null,
-        mvpName: mvpStat?.displayName || mvpStat?.username || null,
-        playerName: userInfo?.displayName || stat.displayName || stat.username || stat.userId,
+        mvpName: mvpStat?.username || mvpStat?.displayName || null,
+        playerName: userInfo?.username || userInfo?.displayName || stat.username || stat.displayName || stat.userId,
         matchDurationSeconds: getServerObservedDurationSeconds(startedAt, completedAt),
         playerStats: {
           kills: Number(stat.kills || 0),
@@ -3316,7 +4229,21 @@ export function createApp(options = {}) {
         summary.eligibleForAward = false;
       }
 
-      const dailyClaimSummary = getUserDailyClaimSummary(store, userKey, appConfig.rewardPolicy, completedAt);
+      const creditAmountQuota = summary.eligibleForAward
+        ? getRewardCreditAmountQuota(summary, appConfig.rewardDelivery)
+        : 0;
+
+      if (
+        rewardBackend === 'newapi' &&
+        summary.eligibleForAward &&
+        creditAmountQuota <= 0 &&
+        !summary.awardBlockedReason
+      ) {
+        summary.awardBlockedReason = 'easy_difficulty';
+        summary.eligibleForAward = false;
+      }
+
+      const dailyClaimSummary = getUserDailyClaimSummary(matchStore, userKey, appConfig.rewardPolicy, completedAt);
       const limitStatus = getRewardLimitStatus(summary, appConfig.rewardPolicy, dailyClaimSummary);
 
       if (summary.eligibleForAward && limitStatus?.limit <= 0) {
@@ -3339,7 +4266,8 @@ export function createApp(options = {}) {
         user: {
           id: String(stat.userId),
           username: userInfo?.username || stat.username || '',
-          displayName: userInfo?.displayName || stat.displayName || stat.username || stat.userId,
+          displayName:
+            userInfo?.username || userInfo?.displayName || stat.username || stat.displayName || stat.userId,
           avatarUrl: null
         },
         summary,
@@ -3347,6 +4275,15 @@ export function createApp(options = {}) {
         rewardPreparedAt: existingClaim || summary.eligibleForAward ? completedAt : null,
         claimedAt: existingClaim?.claimedAt || null,
         assignedCode: existingClaim?.code || null,
+        creditedAt: existingClaim?.claimedAt || null,
+        rewardBackend: existingClaim ? 'cdk' : rewardBackend,
+        deliveryStatus: existingClaim ? 'delivered' : summary.eligibleForAward ? 'ready' : null,
+        creditAmountQuota,
+        creditAmountLabel:
+          rewardBackend === 'newapi' && creditAmountQuota > 0
+            ? formatCreditAmountLabel(creditAmountQuota, appConfig.rewardDelivery)
+            : null,
+        deliveryError: null,
         replay: replayRecord
       });
 
@@ -3458,6 +4395,7 @@ export function createApp(options = {}) {
       oauthConfigured: Boolean(oauthConfig.clientId && oauthConfig.clientSecret),
       awardSecurity,
       rewardPolicy: appConfig.rewardPolicy,
+      rewardDelivery: appConfig.rewardDelivery,
       pvpConfig: appConfig.pvp,
       pvpEvent: appConfig.pvpEvent,
       pvpTransport: getPvpTransportPayload(),
@@ -3487,12 +4425,338 @@ export function createApp(options = {}) {
     };
   }
 
+  async function withUserRewardDeliveryLock(userKey, task) {
+    const normalizedUserKey = String(userKey || '').trim();
+    if (!normalizedUserKey) {
+      return task();
+    }
+
+    const previous = rewardDeliveryLocks.get(normalizedUserKey) || Promise.resolve();
+    let releaseCurrent = () => {};
+    const current = new Promise((resolve) => {
+      releaseCurrent = resolve;
+    });
+    rewardDeliveryLocks.set(normalizedUserKey, current);
+
+    await previous.catch(() => {});
+
+    try {
+      return await task();
+    } finally {
+      releaseCurrent();
+      if (rewardDeliveryLocks.get(normalizedUserKey) === current) {
+        rewardDeliveryLocks.delete(normalizedUserKey);
+      }
+    }
+  }
+
+  function isNewApiDeliveryConfigured() {
+    return Boolean(newapiConfig.baseUrl && newapiConfig.adminAccessToken && newapiConfig.adminUserId);
+  }
+
+  async function fetchNewApiAdminJson(pathname, options = {}) {
+    if (!isNewApiDeliveryConfigured()) {
+      const error = new Error('newapi_not_configured');
+      error.code = 'newapi_not_configured';
+      throw error;
+    }
+
+    const requestUrl = new URL(joinBaseUrl(newapiConfig.baseUrl, pathname));
+    const searchParams =
+      options.searchParams && typeof options.searchParams === 'object' ? options.searchParams : {};
+
+    for (const [key, value] of Object.entries(searchParams)) {
+      if (value === undefined || value === null || value === '') {
+        continue;
+      }
+      requestUrl.searchParams.set(key, String(value));
+    }
+
+    const headers = {
+      Accept: 'application/json',
+      Authorization: `Bearer ${newapiConfig.adminAccessToken}`,
+      'New-Api-User': newapiConfig.adminUserId
+    };
+
+    let body;
+    if (options.body !== undefined) {
+      headers['Content-Type'] = 'application/json';
+      body = JSON.stringify(options.body);
+    }
+
+    const response = await fetchImpl(requestUrl.toString(), {
+      method: options.method || 'GET',
+      headers,
+      body
+    });
+
+    const text = await response.text();
+    let payload = {};
+    try {
+      payload = text ? JSON.parse(text) : {};
+    } catch {
+      payload = text ? { raw: text } : {};
+    }
+
+    if (!response.ok) {
+      const error = new Error(
+        payload?.message || payload?.error || `newapi_http_${response.status}`
+      );
+      error.code = `newapi_http_${response.status}`;
+      error.status = response.status;
+      error.payload = payload;
+      throw error;
+    }
+
+    if (payload && typeof payload === 'object' && payload.success === false) {
+      const error = new Error(payload.message || payload.error || 'newapi_request_failed');
+      error.code = 'newapi_request_failed';
+      error.status = response.status;
+      error.payload = payload;
+      throw error;
+    }
+
+    return payload;
+  }
+
+  function unwrapNewApiData(payload) {
+    if (!payload || typeof payload !== 'object') {
+      return payload;
+    }
+
+    if ('data' in payload) {
+      return payload.data;
+    }
+
+    return payload;
+  }
+
+  function extractNewApiUserCandidates(payload) {
+    const data = unwrapNewApiData(payload);
+    if (Array.isArray(data)) {
+      return data;
+    }
+    if (Array.isArray(data?.items)) {
+      return data.items;
+    }
+    if (Array.isArray(data?.data)) {
+      return data.data;
+    }
+    if (Array.isArray(payload?.items)) {
+      return payload.items;
+    }
+    return [];
+  }
+
+  function normalizeNewApiUserRecord(input) {
+    if (!input || typeof input !== 'object') {
+      return null;
+    }
+
+    const id = input.id ?? input.user_id ?? null;
+    if (id === null || id === undefined || id === '') {
+      return null;
+    }
+
+    return {
+      ...input,
+      id: String(id),
+      username: String(input.username || input.user_name || ''),
+      displayName: String(input.display_name || input.displayName || input.username || id),
+      linux_do_id:
+        input.linux_do_id === undefined || input.linux_do_id === null || input.linux_do_id === ''
+          ? null
+          : String(input.linux_do_id),
+      quota: normalizeNonNegativeInteger(input.quota, 0)
+    };
+  }
+
+  async function searchNewApiUsers(keyword) {
+    const normalizedKeyword = String(keyword || '').trim();
+    if (!normalizedKeyword) {
+      return [];
+    }
+
+    const payload = await fetchNewApiAdminJson('/api/user/search', {
+      searchParams: {
+        keyword: normalizedKeyword,
+        p: 0,
+        page_size: 20
+      }
+    });
+
+    return extractNewApiUserCandidates(payload).map((entry) => normalizeNewApiUserRecord(entry)).filter(Boolean);
+  }
+
+  async function getNewApiUserDetail(userId) {
+    const normalizedUserId = String(userId || '').trim();
+    if (!normalizedUserId) {
+      return null;
+    }
+
+    const payload = await fetchNewApiAdminJson(`/api/user/${encodeURIComponent(normalizedUserId)}`);
+    return normalizeNewApiUserRecord(unwrapNewApiData(payload));
+  }
+
+  async function findNewApiUserForGameUser(user) {
+    const targetLinuxDoId = String(user?.id || '').trim();
+    if (!targetLinuxDoId) {
+      return null;
+    }
+
+    const candidateIds = new Set();
+    const searchKeywords = [
+      String(user?.id || '').trim(),
+      String(user?.username || '').trim()
+    ].filter(Boolean);
+
+    for (const keyword of searchKeywords) {
+      const candidates = await searchNewApiUsers(keyword);
+      for (const candidate of candidates) {
+        if (!candidate?.id || candidateIds.has(candidate.id)) {
+          continue;
+        }
+        candidateIds.add(candidate.id);
+      }
+    }
+
+    for (const candidateId of candidateIds) {
+      let detail = null;
+      try {
+        detail = await getNewApiUserDetail(candidateId);
+      } catch (error) {
+        if (error?.status === 404) {
+          continue;
+        }
+        throw error;
+      }
+
+      if (!detail) {
+        continue;
+      }
+
+      if (String(detail.linux_do_id || '') === targetLinuxDoId) {
+        return detail;
+      }
+    }
+
+    return null;
+  }
+
+  function buildNewApiUserUpdatePayload(userDetail, nextQuota) {
+    const source = userDetail && typeof userDetail === 'object' ? userDetail : {};
+    const numericId = Number(source.id);
+    const numericRole = Number(source.role);
+    const numericStatus = Number(source.status);
+    const payload = {
+      id: Number.isFinite(numericId) ? numericId : source.id,
+      username: source.username,
+      display_name: source.display_name || source.displayName || source.username || '',
+      email: source.email,
+      group: source.group,
+      role: Number.isFinite(numericRole) ? numericRole : undefined,
+      status: Number.isFinite(numericStatus) ? numericStatus : undefined,
+      linux_do_id: source.linux_do_id,
+      quota: normalizeNonNegativeInteger(nextQuota, 0)
+    };
+
+    return Object.fromEntries(
+      Object.entries(payload).filter(([, value]) => value !== undefined && value !== null && value !== '')
+    );
+  }
+
+  async function creditNewApiQuotaForUser(user, creditAmountQuota, rewardDelivery = null) {
+    if (!isNewApiDeliveryConfigured()) {
+      return {
+        deliveryStatus: 'delivery_unavailable',
+        deliveryError: 'newapi_not_configured'
+      };
+    }
+
+    const normalizedQuota = normalizeNonNegativeInteger(creditAmountQuota, 0);
+    const matchedUser = await findNewApiUserForGameUser(user);
+    if (!matchedUser) {
+      return {
+        deliveryStatus: 'awaiting_newapi_account',
+        deliveryError: 'newapi_account_not_found'
+      };
+    }
+
+    if (newapiRewardCreditImpl) {
+      return newapiRewardCreditImpl({
+        matchedUser,
+        gameUser: user,
+        creditAmountQuota: normalizedQuota,
+        rewardDelivery
+      });
+    }
+
+    const previousQuota = normalizeNonNegativeInteger(matchedUser.quota, 0);
+    const nextQuota = previousQuota + normalizedQuota;
+    await fetchNewApiAdminJson('/api/user/', {
+      method: 'PUT',
+      body: buildNewApiUserUpdatePayload(matchedUser, nextQuota)
+    });
+
+    return {
+      deliveryStatus: 'delivered',
+      deliveryError: null,
+      creditedAt: getNowIso(),
+      newapiUserId: String(matchedUser.id || ''),
+      previousQuota,
+      nextQuota
+    };
+  }
+
+  // 封禁检查：返回 null（放行）或 { expiresAt, remainingDays }（被封）。
+  // 基于 readAppConfig() 的 bannedLinuxdoIds + banExpiresAt。admin 账号不受封禁影响。
+  async function getActiveBan(user) {
+    if (!user || !user.id) return null;
+    const appConfig = await readAppConfig();
+    const bannedIds = appConfig.bannedLinuxdoIds || [];
+    if (!bannedIds.includes(String(user.id))) return null;
+
+    // admin 不封（避免误封管理员导致无人可解封）
+    const adminIds = appConfig.adminUserIds || [];
+    const adminNames = appConfig.adminUsernames || [];
+    if (
+      adminIds.includes(String(user.id)) ||
+      adminNames.includes(String(user.preferred_username || user.username || ''))
+    ) {
+      return null;
+    }
+
+    let expiresAt = appConfig.banExpiresAt;
+    let remainingDays = null;
+    if (expiresAt) {
+      const expiry = Date.parse(expiresAt);
+      if (Number.isFinite(expiry)) {
+        const ms = expiry - Date.now();
+        if (ms <= 0) {
+          // 已过期：封禁失效，清理建议交给管理员，但当前放行
+          return null;
+        }
+        remainingDays = Math.ceil(ms / (24 * 60 * 60 * 1000));
+      }
+    }
+    return { expiresAt: expiresAt || null, remainingDays };
+  }
+
   async function requireUser(req, res) {
     const payload = await getSessionPayload(req);
     if (!payload.user) {
       sendJson(res, 401, {
         error: 'not_authenticated',
         oauthConfigured: payload.oauthConfigured
+      });
+      return null;
+    }
+    const ban = await getActiveBan(payload.user);
+    if (ban) {
+      sendJson(res, 403, {
+        error: 'account_banned',
+        banExpiresAt: ban.expiresAt,
+        remainingDays: ban.remainingDays
       });
       return null;
     }
@@ -3508,6 +4772,20 @@ export function createApp(options = {}) {
         {
           error: 'not_authenticated',
           oauthConfigured: payload.oauthConfigured
+        },
+        getPvpCorsHeaders(req)
+      );
+      return null;
+    }
+    const ban = await getActiveBan(payload.user);
+    if (ban) {
+      sendJson(
+        res,
+        403,
+        {
+          error: 'account_banned',
+          banExpiresAt: ban.expiresAt,
+          remainingDays: ban.remainingDays
         },
         getPvpCorsHeaders(req)
       );
@@ -3848,6 +5126,22 @@ export function createApp(options = {}) {
     const payload = await requireUser(req, res);
     if (!payload) return;
 
+    // Phase A：速率限制（防快速刷 ticket）
+    if (rateLimitEnabled) {
+      const blocked = rateLimiter.enforce(
+        '/api/awards/matches/start',
+        REWARD_RATE_LIMITS,
+        getClientIp(req),
+        getUserKey(payload.user),
+        Date.now()
+      );
+      if (blocked) {
+        res.setHeader('Retry-After', String(Math.ceil((blocked.retryAfterMs || 60_000) / 1000)));
+        sendJson(res, 429, { error: 'rate_limited', retryAfterMs: blocked.retryAfterMs });
+        return;
+      }
+    }
+
     let body;
     try {
       body = await readJsonBody(req);
@@ -3860,6 +5154,13 @@ export function createApp(options = {}) {
 
     const codePool = resolveRequestedCodePool(body);
     const rewardPool = getRewardPoolFamily(codePool);
+    // Phase A §2.1.2：PVE 链路禁止产出 PVP 奖。真实 PVP 对局由 recordPvpMatchResult
+    // 写入带 pvp: 前缀的 ticketId 并直接预置 pendingAward；此处的 start 端点只服务 PVE，
+    // 若客户端自报 codePool/matchType 解析为 pvp，一律拒绝，堵住「走 PVE 接口冒领 PVP 池」。
+    if (rewardPool === 'pvp') {
+      sendJson(res, 409, { error: 'pvp_pool_requires_server_match' });
+      return;
+    }
     const ticket = {
       ticketId: randomUUID(),
       startedAt: getNowIso(),
@@ -3878,10 +5179,104 @@ export function createApp(options = {}) {
     };
 
     payload.session.activeMatch = ticket;
+    payload.session.lastClaimResult = null;
+    // 新对局开始：清掉上一局的见证状态（per-ticket 隔离）
+    payload.session.activeMatchWitness = null;
+    payload.session.activeMatchWitnessTicketId = null;
 
     sendJson(res, 200, {
       activeMatch: ticket,
       pendingAward: summarizePendingAward(payload.session.pendingAward || null)
+    });
+  }
+
+  // Phase C：PVE 心跳见证端点。客户端在对局中增量上报事件，服务端累计并校验，
+  // 作为 prepare 结算时的领奖证据。见 docs/plans/2026-06-23 §2.2。
+  async function handlePveWitnessEvent(req, res) {
+    if (req.method !== 'POST') {
+      sendMethodNotAllowed(res);
+      return;
+    }
+
+    const payload = await requireUser(req, res);
+    if (!payload) return;
+
+    // 限流（心跳密集，单独宽松配置，复用 start 的 IP 维度）
+    if (rateLimitEnabled) {
+      const blocked = rateLimiter.enforce(
+        '/api/awards/pve-event',
+        {
+          '/api/awards/pve-event': {
+            perUser: 30, perUserWindowMs: 10_000, perIp: 90, perIpWindowMs: 10_000
+          }
+        },
+        getClientIp(req),
+        getUserKey(payload.user),
+        Date.now()
+      );
+      if (blocked) {
+        res.setHeader('Retry-After', String(Math.ceil((blocked.retryAfterMs || 10_000) / 1000)));
+        sendJson(res, 429, { error: 'rate_limited', retryAfterMs: blocked.retryAfterMs });
+        return;
+      }
+    }
+
+    let body;
+    try {
+      body = await readJsonBody(req);
+    } catch (error) {
+      sendJson(res, 400, {
+        error: error.message === 'request_too_large' ? 'request_too_large' : 'invalid_json'
+      });
+      return;
+    }
+
+    const ticketId = typeof body.ticketId === 'string' ? body.ticketId.trim() : '';
+    const activeMatch = payload.session.activeMatch || null;
+    if (!ticketId || !activeMatch || activeMatch.ticketId !== ticketId) {
+      sendJson(res, 409, { error: 'match_ticket_missing' });
+      return;
+    }
+    if (activeMatch.consumed) {
+      sendJson(res, 409, { error: 'match_ticket_consumed' });
+      return;
+    }
+    // 见证只服务 PVE；PVP 对局不走此端点
+    if ((activeMatch.matchType || activeMatch.rewardPool) !== 'pve') {
+      sendJson(res, 409, { error: 'pvp_pool_requires_server_match' });
+      return;
+    }
+
+    // 懒初始化 per-ticket 见证状态
+    if (!payload.session.activeMatchWitness || payload.session.activeMatchWitnessTicketId !== ticketId) {
+      payload.session.activeMatchWitness = createWitnessState();
+      payload.session.activeMatchWitnessTicketId = ticketId;
+    }
+    const witness = payload.session.activeMatchWitness;
+
+    const result = ingestWitnessEvent(witness, body.event || {}, getNowMs());
+    if (!result.ok) {
+      // 乱序/非法类型/速率：标记 tainted 并返回对应状态，但仍 200 携带拒绝原因
+      // （事件本身已累计到 witness.eventCount 用于诊断；tainted 已在 ingest 内置位）
+      sendJson(res, 200, {
+        accepted: false,
+        witnessedKills: witness.witnessedKills,
+        witnessedDamage: Math.round(witness.witnessedDamage),
+        eventCount: witness.eventCount,
+        tainted: witness.tainted,
+        taintReason: witness.taintReason,
+        rejectReason: result.error
+      });
+      return;
+    }
+
+    sendJson(res, 200, {
+      accepted: true,
+      witnessedKills: witness.witnessedKills,
+      witnessedDamage: Math.round(witness.witnessedDamage),
+      eventCount: witness.eventCount,
+      tainted: witness.tainted,
+      taintReason: witness.taintReason
     });
   }
 
@@ -3893,6 +5288,22 @@ export function createApp(options = {}) {
 
     const payload = await requireUser(req, res);
     if (!payload) return;
+
+    // Phase A：速率限制
+    if (rateLimitEnabled) {
+      const blocked = rateLimiter.enforce(
+        '/api/awards/prepare',
+        REWARD_RATE_LIMITS,
+        getClientIp(req),
+        getUserKey(payload.user),
+        Date.now()
+      );
+      if (blocked) {
+        res.setHeader('Retry-After', String(Math.ceil((blocked.retryAfterMs || 60_000) / 1000)));
+        sendJson(res, 429, { error: 'rate_limited', retryAfterMs: blocked.retryAfterMs });
+        return;
+      }
+    }
 
     let body;
     try {
@@ -3936,20 +5347,63 @@ export function createApp(options = {}) {
     });
     const codePool = getCodePoolForSummary(summary);
 
-    if (!allowClientReportedAwards && !summary.awardBlockedReason) {
-      summary.awardBlockedReason = 'server_verification_required';
-      summary.eligibleForAward = false;
+    // Phase C：安全态（!allowClientReportedAwards）下，PVE 领奖必须由服务端见证驱动。
+    // 有见证（session.activeMatchWitness 且 ticketId 匹配）→ 用见证累计的击杀/伤害/胜负
+    // 和服务端墙钟时长重建 summary，绕过 server_verification_required。
+    // 无见证或见证不完整 → 维持 server_verification_required，拒绝发奖。
+    const witness =
+      payload.session.activeMatchWitnessTicketId === ticketId
+        ? payload.session.activeMatchWitness
+        : null;
+    if (!allowClientReportedAwards) {
+      if (witness) {
+        // 用见证数据覆盖领奖关键字段
+        const witnessed = buildWitnessedSummary(witness, summary, serverObservedDuration);
+        // 把见证结论写回 summary（保留 sanitize 已算的展示字段如 playerName）
+        summary.playerWon = witnessed.playerWon;
+        summary.playerIsMvp = witnessed.playerIsMvp;
+        summary.winnerTeam = witnessed.winnerTeam;
+        summary.playerTeam = witnessed.playerTeam;
+        summary.matchDurationSeconds = witnessed.matchDurationSeconds;
+        summary.playerStats = witnessed.playerStats;
+        summary.awardSource = 'pve_witnessed';
+        summary.eligibleForAward = witnessed.eligibleForAward;
+        summary.awardBlockedReason = witnessed.awardBlockedReason ?? null;
+      } else if (!summary.awardBlockedReason) {
+        summary.awardBlockedReason = 'server_verification_required';
+        summary.eligibleForAward = false;
+      }
     }
 
     const store = await readCdkStore();
     const matchStore = await readMatchStore();
+    backfillMatchStoreFromClaims(matchStore, store);
     const userKey = getUserKey(payload.user);
     const availableCounts = getAvailableCounts(store);
     const availableCount = getCodePoolFallbacks(codePool).reduce(
       (sum, pool) => sum + selectPoolCount(availableCounts, pool),
       0
     );
-    const dailyClaimSummary = getUserDailyClaimSummary(store, userKey, payload.rewardPolicy, completedAt);
+    const rewardBackend = normalizeRewardDeliveryBackend(payload.rewardDelivery?.backend, 'newapi');
+    const creditAmountQuota = summary.eligibleForAward
+      ? getRewardCreditAmountQuota(summary, payload.rewardDelivery)
+      : 0;
+    const creditAmountLabel =
+      rewardBackend === 'newapi' && creditAmountQuota > 0
+        ? formatCreditAmountLabel(creditAmountQuota, payload.rewardDelivery)
+        : null;
+
+    if (
+      rewardBackend === 'newapi' &&
+      summary.eligibleForAward &&
+      creditAmountQuota <= 0 &&
+      !summary.awardBlockedReason
+    ) {
+      summary.awardBlockedReason = 'easy_difficulty';
+      summary.eligibleForAward = false;
+    }
+
+    const dailyClaimSummary = getUserDailyClaimSummary(matchStore, userKey, payload.rewardPolicy, completedAt);
     const limitStatus = getRewardLimitStatus(summary, payload.rewardPolicy, dailyClaimSummary);
 
     if (summary.eligibleForAward && limitStatus?.limit <= 0) {
@@ -3962,22 +5416,7 @@ export function createApp(options = {}) {
       consumed: true
     };
 
-    upsertMatchRecord(matchStore, {
-      ticketId,
-      pool: codePool,
-      startedAt: activeMatch.startedAt || null,
-      completedAt,
-      recordedAt: completedAt,
-      user: summarizeUser(payload.user),
-      summary,
-      rewardStatus: summary.eligibleForAward ? 'ready' : 'not_eligible'
-    });
-
-    const existingClaim = store.cdks.find(
-      (entry) =>
-        entry.claimedBy?.key === userKey &&
-        entry.claimContext?.matchTicketId === ticketId
-    );
+    const existingClaim = findClaimedMatchForUserByTicket(matchStore, payload.user, ticketId);
 
     if (existingClaim) {
       upsertMatchRecord(matchStore, {
@@ -3989,25 +5428,53 @@ export function createApp(options = {}) {
         user: summarizeUser(payload.user),
         summary,
         rewardStatus: 'claimed',
-        rewardPreparedAt: existingClaim.claimContext?.preparedAt || null,
+        rewardPreparedAt: existingClaim.rewardPreparedAt || existingClaim.claimContext?.preparedAt || null,
         claimedAt: existingClaim.claimedAt || null,
-        assignedCode: existingClaim.code || null
+        creditedAt: existingClaim.creditedAt || existingClaim.claimedAt || null,
+        assignedCode: existingClaim.assignedCode || existingClaim.code || null,
+        rewardBackend: existingClaim.rewardBackend || rewardBackend,
+        deliveryStatus: existingClaim.deliveryStatus || 'delivered',
+        creditAmountQuota: existingClaim.creditAmountQuota ?? creditAmountQuota,
+        creditAmountLabel: existingClaim.creditAmountLabel || creditAmountLabel,
+        newapiUserId: existingClaim.newapiUserId || null,
+        deliveryError: existingClaim.deliveryError || null
       });
       await writeMatchStore(matchStore);
       sendJson(res, 200, {
         prepared: false,
         eligible: summary.eligibleForAward,
         alreadyClaimed: true,
-        latestClaim: summarizeCdk(existingClaim),
+        latestClaim: summarizeRewardClaimFromMatchRecord(existingClaim, payload.rewardDelivery),
         pendingAward: null,
         availableCount,
         availableCounts,
         limitStatus,
         rewardPool: summary.rewardPool,
-        codePool: existingClaim.pool || codePool
+        codePool: existingClaim.pool || codePool,
+        rewardBackend: existingClaim.rewardBackend || rewardBackend,
+        deliveryStatus: existingClaim.deliveryStatus || 'delivered',
+        creditAmountQuota: existingClaim.creditAmountQuota ?? creditAmountQuota,
+        creditAmountLabel: existingClaim.creditAmountLabel || creditAmountLabel,
+        deliveryError: existingClaim.deliveryError || null
       });
       return;
     }
+
+    upsertMatchRecord(matchStore, {
+      ticketId,
+      pool: codePool,
+      startedAt: activeMatch.startedAt || null,
+      completedAt,
+      recordedAt: completedAt,
+      user: summarizeUser(payload.user),
+      summary,
+      rewardStatus: summary.eligibleForAward ? 'ready' : 'not_eligible',
+      rewardBackend,
+      deliveryStatus: summary.eligibleForAward ? 'ready' : null,
+      creditAmountQuota,
+      creditAmountLabel,
+      deliveryError: null
+    });
 
     if (!summary.eligibleForAward) {
       await writeMatchStore(matchStore);
@@ -4021,7 +5488,12 @@ export function createApp(options = {}) {
         availableCounts,
         limitStatus,
         rewardPool: summary.rewardPool,
-        codePool
+        codePool,
+        rewardBackend,
+        deliveryStatus: null,
+        creditAmountQuota,
+        creditAmountLabel,
+        deliveryError: null
       });
       return;
     }
@@ -4047,7 +5519,12 @@ export function createApp(options = {}) {
         availableCounts,
         limitStatus,
         rewardPool: summary.rewardPool,
-        codePool
+        codePool,
+        rewardBackend,
+        deliveryStatus: 'ready',
+        creditAmountQuota,
+        creditAmountLabel,
+        deliveryError: null
       });
       return;
     }
@@ -4068,7 +5545,12 @@ export function createApp(options = {}) {
       user: summarizeUser(payload.user),
       summary,
       rewardStatus: 'ready',
-      rewardPreparedAt: completedAt
+      rewardPreparedAt: completedAt,
+      rewardBackend,
+      deliveryStatus: 'ready',
+      creditAmountQuota,
+      creditAmountLabel,
+      deliveryError: null
     });
     await writeMatchStore(matchStore);
 
@@ -4080,7 +5562,12 @@ export function createApp(options = {}) {
       availableCounts,
       limitStatus,
       rewardPool: summary.rewardPool,
-      codePool
+      codePool,
+      rewardBackend,
+      deliveryStatus: 'ready',
+      creditAmountQuota,
+      creditAmountLabel,
+      deliveryError: null
     });
   }
 
@@ -4090,46 +5577,12 @@ export function createApp(options = {}) {
 
     const store = await readCdkStore();
     const matchStore = await readMatchStore();
-    const userKey = getUserKey(payload.user);
+    if (backfillMatchStoreFromClaims(matchStore, store)) {
+      await writeMatchStore(matchStore);
+    }
     ensureSessionPendingAwardFromMatchStore(payload.session, payload.user, matchStore);
-    const items = store.cdks
-      .filter((entry) => entry.claimedBy?.key === userKey)
-      .sort((left, right) => String(right.claimedAt || '').localeCompare(String(left.claimedAt || '')));
-    const availableCounts = getAvailableCounts(store);
-    const claimSummary = getUserClaimSummary(store, userKey);
-    const dailyClaimSummary = getUserDailyClaimSummary(store, userKey, payload.rewardPolicy, getNowIso());
-    const pendingAward = summarizePendingAward(payload.session.pendingAward || null);
-    const pendingPool = getRewardPoolFamily(
-      pendingAward?.summary?.rewardPool || pendingAward?.summary?.matchType || pendingAward?.summary?.gameMode
-    );
-    const pendingCodePool = pendingAward ? getCodePoolForSummary(pendingAward.summary) : null;
-    const pendingAvailableCount = pendingAward
-      ? getCodePoolFallbacks(pendingCodePool).reduce(
-          (sum, pool) => sum + selectPoolCount(availableCounts, pool),
-          0
-        )
-      : 0;
-    const pendingLimitStatus = pendingAward
-      ? getRewardLimitStatus(pendingAward.summary, payload.rewardPolicy, dailyClaimSummary)
-      : null;
 
-    sendJson(res, 200, {
-      latestClaim: items.length ? summarizeCdk(items[0]) : null,
-      recentClaims: items.slice(0, 5).map(summarizeCdk),
-      claimCount: claimSummary.total,
-      claimCounts: claimSummary.byPool,
-      dailyClaims: dailyClaimSummary,
-      availableCount: pendingAward
-        ? pendingAvailableCount
-        : getTotalAvailableCodeCount(availableCounts),
-      availableCounts,
-      pendingPool,
-      pendingCodePool,
-      pendingAvailableCount,
-      pendingLimitStatus,
-      pendingAward,
-      rewardPolicy: payload.rewardPolicy
-    });
+    sendJson(res, 200, buildRewardsPayload(store, matchStore, payload));
   }
 
   async function handleClaimCdk(req, res) {
@@ -4141,8 +5594,27 @@ export function createApp(options = {}) {
     const payload = await requireUser(req, res);
     if (!payload) return;
 
+    // Phase A：速率限制（防快速循环 claim）
+    if (rateLimitEnabled) {
+      const blocked = rateLimiter.enforce(
+        '/api/cdks/claim',
+        REWARD_RATE_LIMITS,
+        getClientIp(req),
+        getUserKey(payload.user),
+        Date.now()
+      );
+      if (blocked) {
+        res.setHeader('Retry-After', String(Math.ceil((blocked.retryAfterMs || 60_000) / 1000)));
+        sendJson(res, 429, { error: 'rate_limited', retryAfterMs: blocked.retryAfterMs });
+        return;
+      }
+    }
+
     const store = await readCdkStore();
     const matchStore = await readMatchStore();
+    if (backfillMatchStoreFromClaims(matchStore, store)) {
+      await writeMatchStore(matchStore);
+    }
     const userKey = getUserKey(payload.user);
     const pendingAward =
       payload.session.pendingAward ||
@@ -4150,6 +5622,36 @@ export function createApp(options = {}) {
       null;
 
     if (!pendingAward) {
+      if (payload.session.lastClaimResult) {
+        const repeatedClaim = payload.session.lastClaimResult;
+        const repeatedState = buildRewardsPayload(store, matchStore, payload);
+        sendJson(res, 200, {
+          ...repeatedState,
+          assignedCdk: repeatedClaim.code
+            ? {
+                code: repeatedClaim.code,
+                pool: repeatedClaim.pool,
+                claimedAt: repeatedClaim.claimedAt || repeatedClaim.creditedAt || null,
+                claimContext: repeatedClaim.claimContext || null
+              }
+            : null,
+          assignedReward: repeatedClaim,
+          newlyClaimed: false,
+          rewardPool: getRewardPoolFamily(
+            repeatedClaim.claimContext?.summary?.rewardPool ||
+              repeatedClaim.claimContext?.summary?.matchType ||
+              repeatedClaim.pool
+          ),
+          codePool: repeatedClaim.pool || DEFAULT_REWARD_POOL,
+          rewardBackend: repeatedClaim.rewardBackend || normalizeRewardDeliveryBackend(payload.rewardDelivery?.backend, 'newapi'),
+          deliveryStatus: repeatedClaim.deliveryStatus || 'delivered',
+          creditAmountQuota: repeatedClaim.creditAmountQuota || 0,
+          creditAmountLabel: repeatedClaim.creditAmountLabel || null,
+          deliveryError: repeatedClaim.deliveryError || null
+        });
+        return;
+      }
+
       sendJson(res, 409, {
         error: 'award_not_ready'
       });
@@ -4160,45 +5662,42 @@ export function createApp(options = {}) {
     const rewardPool = getRewardPoolFamily(pendingSummary.rewardPool || pendingSummary.matchType);
     const codePool = getCodePoolForSummary(pendingSummary);
     const availableCounts = getAvailableCounts(store);
-    const dailyClaimSummary = getUserDailyClaimSummary(store, userKey, payload.rewardPolicy, getNowIso());
+    const rewardBackend = normalizeRewardDeliveryBackend(payload.rewardDelivery?.backend, 'newapi');
+    const creditAmountQuota = getRewardCreditAmountQuota(pendingSummary, payload.rewardDelivery);
+    const creditAmountLabel =
+      rewardBackend === 'newapi' && creditAmountQuota > 0
+        ? formatCreditAmountLabel(creditAmountQuota, payload.rewardDelivery)
+        : null;
+    const dailyClaimSummary = getUserDailyClaimSummary(matchStore, userKey, payload.rewardPolicy, getNowIso());
     const limitStatus = getRewardLimitStatus(pendingSummary, payload.rewardPolicy, dailyClaimSummary);
 
-    const existing = store.cdks.find(
-      (entry) =>
-        entry.claimedBy?.key === userKey &&
-        entry.claimContext?.matchTicketId === pendingAward.ticketId
-    );
+    const existingMatchClaim = findClaimedMatchForUserByTicket(matchStore, payload.user, pendingAward.ticketId);
 
-    if (existing) {
-      upsertMatchRecord(matchStore, {
-        ticketId: pendingAward.ticketId,
-        pool: existing.pool || codePool,
-        completedAt: pendingAward.preparedAt,
-        recordedAt: getNowIso(),
-        user: summarizeUser(payload.user),
-        summary: pendingAward.summary,
-        rewardStatus: 'claimed',
-        rewardPreparedAt: pendingAward.preparedAt,
-        claimedAt: existing.claimedAt || null,
-        assignedCode: existing.code || null
-      });
-      await writeMatchStore(matchStore);
+    if (existingMatchClaim) {
       payload.session.pendingAward = null;
-      const claimSummary = getUserClaimSummary(store, userKey);
+      const repeatedClaim = summarizeRewardClaimFromMatchRecord(existingMatchClaim, payload.rewardDelivery);
+      payload.session.lastClaimResult = repeatedClaim;
+      const nextState = buildRewardsPayload(store, matchStore, payload, existingMatchClaim.creditedAt || existingMatchClaim.claimedAt || getNowIso());
       sendJson(res, 200, {
-        assignedCdk: summarizeCdk(existing),
+        ...nextState,
+        assignedCdk: repeatedClaim.code
+          ? {
+              code: repeatedClaim.code,
+              pool: repeatedClaim.pool,
+              claimedAt: repeatedClaim.claimedAt || repeatedClaim.creditedAt || null,
+              claimContext: repeatedClaim.claimContext || null
+            }
+          : null,
+        assignedReward: repeatedClaim,
         newlyClaimed: false,
-        availableCount: getCodePoolFallbacks(codePool).reduce(
-          (sum, pool) => sum + selectPoolCount(availableCounts, pool),
-          0
-        ),
-        availableCounts,
-        claimCount: claimSummary.total,
-        claimCounts: claimSummary.byPool,
-        dailyClaims: dailyClaimSummary,
         limitStatus,
         rewardPool,
-        codePool: existing.pool || codePool
+        codePool: existingMatchClaim.pool || codePool,
+        rewardBackend: repeatedClaim.rewardBackend || rewardBackend,
+        deliveryStatus: repeatedClaim.deliveryStatus || 'delivered',
+        creditAmountQuota: repeatedClaim.creditAmountQuota || 0,
+        creditAmountLabel: repeatedClaim.creditAmountLabel || null,
+        deliveryError: repeatedClaim.deliveryError || null
       });
       return;
     }
@@ -4215,10 +5714,16 @@ export function createApp(options = {}) {
           eligibleForAward: false,
           awardBlockedReason: 'daily_limit_disabled'
         },
-        rewardStatus: 'not_eligible'
+        rewardStatus: 'not_eligible',
+        rewardBackend,
+        deliveryStatus: null,
+        creditAmountQuota,
+        creditAmountLabel,
+        deliveryError: null
       });
       await writeMatchStore(matchStore);
       payload.session.pendingAward = null;
+      payload.session.lastClaimResult = null;
       sendJson(res, 409, {
         error: 'award_not_eligible',
         disqualifyReason: 'daily_limit_disabled',
@@ -4229,7 +5734,12 @@ export function createApp(options = {}) {
         },
         rewardPool,
         codePool,
-        limitStatus
+        limitStatus,
+        rewardBackend,
+        deliveryStatus: null,
+        creditAmountQuota,
+        creditAmountLabel,
+        deliveryError: null
       });
       return;
     }
@@ -4242,17 +5752,28 @@ export function createApp(options = {}) {
         recordedAt: getNowIso(),
         user: summarizeUser(payload.user),
         summary: pendingSummary,
-        rewardStatus: 'not_eligible'
+        rewardStatus: 'not_eligible',
+        rewardBackend,
+        deliveryStatus: null,
+        creditAmountQuota,
+        creditAmountLabel,
+        deliveryError: null
       });
       await writeMatchStore(matchStore);
       payload.session.pendingAward = null;
+      payload.session.lastClaimResult = null;
       sendJson(res, 409, {
         error: 'award_not_eligible',
         disqualifyReason: pendingSummary.awardBlockedReason || 'award_not_eligible',
         summary: pendingSummary,
         rewardPool,
         codePool,
-        limitStatus
+        limitStatus,
+        rewardBackend,
+        deliveryStatus: null,
+        creditAmountQuota,
+        creditAmountLabel,
+        deliveryError: null
       });
       return;
     }
@@ -4262,8 +5783,248 @@ export function createApp(options = {}) {
         error: 'daily_limit_reached',
         rewardPool,
         codePool,
-        limitStatus
+        limitStatus,
+        rewardBackend,
+        deliveryStatus: 'ready',
+        creditAmountQuota,
+        creditAmountLabel,
+        deliveryError: null
       });
+      return;
+    }
+
+    if (rewardBackend === 'newapi' && creditAmountQuota <= 0) {
+      upsertMatchRecord(matchStore, {
+        ticketId: pendingAward.ticketId,
+        pool: codePool,
+        completedAt: pendingAward.preparedAt,
+        recordedAt: getNowIso(),
+        user: summarizeUser(payload.user),
+        summary: {
+          ...pendingSummary,
+          eligibleForAward: false,
+          awardBlockedReason: 'easy_difficulty'
+        },
+        rewardStatus: 'not_eligible',
+        rewardBackend,
+        deliveryStatus: null,
+        creditAmountQuota: 0,
+        creditAmountLabel: null,
+        deliveryError: null
+      });
+      await writeMatchStore(matchStore);
+      payload.session.pendingAward = null;
+      payload.session.lastClaimResult = null;
+      sendJson(res, 409, {
+        error: 'award_not_eligible',
+        disqualifyReason: 'easy_difficulty',
+        summary: {
+          ...pendingSummary,
+          eligibleForAward: false,
+          awardBlockedReason: 'easy_difficulty'
+        },
+        rewardPool,
+        codePool,
+        limitStatus,
+        rewardBackend,
+        deliveryStatus: null,
+        creditAmountQuota: 0,
+        creditAmountLabel: null,
+        deliveryError: null
+      });
+      return;
+    }
+
+    if (rewardBackend === 'newapi') {
+      const deliveryResult = await withUserRewardDeliveryLock(userKey, async () => {
+        const lockedStore = await readCdkStore();
+        const lockedMatchStore = await readMatchStore();
+        backfillMatchStoreFromClaims(lockedMatchStore, lockedStore);
+
+        const lockedExistingClaim = findClaimedMatchForUserByTicket(lockedMatchStore, payload.user, pendingAward.ticketId);
+        if (lockedExistingClaim) {
+          return {
+            kind: 'existing',
+            store: lockedStore,
+            matchStore: lockedMatchStore,
+            claim: summarizeRewardClaimFromMatchRecord(lockedExistingClaim, payload.rewardDelivery)
+          };
+        }
+
+        const lockedDailyClaimSummary = getUserDailyClaimSummary(
+          lockedMatchStore,
+          userKey,
+          payload.rewardPolicy,
+          getNowIso()
+        );
+        const lockedLimitStatus = getRewardLimitStatus(
+          pendingSummary,
+          payload.rewardPolicy,
+          lockedDailyClaimSummary
+        );
+
+        if (lockedLimitStatus?.reached) {
+          return {
+            kind: 'limit_reached',
+            store: lockedStore,
+            matchStore: lockedMatchStore,
+            limitStatus: lockedLimitStatus
+          };
+        }
+
+        let delivery;
+        try {
+          delivery = await creditNewApiQuotaForUser(
+            payload.user,
+            creditAmountQuota,
+            payload.rewardDelivery
+          );
+        } catch (error) {
+          upsertMatchRecord(lockedMatchStore, {
+            ticketId: pendingAward.ticketId,
+            pool: codePool,
+            completedAt: pendingAward.preparedAt,
+            recordedAt: getNowIso(),
+            user: summarizeUser(payload.user),
+            summary: pendingAward.summary,
+            rewardStatus: 'ready',
+            rewardPreparedAt: pendingAward.preparedAt,
+            rewardBackend: 'newapi',
+            deliveryStatus: 'delivery_failed',
+            creditAmountQuota,
+            creditAmountLabel,
+            deliveryError: error.code || error.message || 'delivery_failed'
+          });
+          await writeMatchStore(lockedMatchStore);
+          return {
+            kind: 'pending',
+            store: lockedStore,
+            matchStore: lockedMatchStore,
+            limitStatus: lockedLimitStatus,
+            deliveryStatus: 'delivery_failed',
+            deliveryError: error.code || error.message || 'delivery_failed'
+          };
+        }
+
+        if (delivery.deliveryStatus !== 'delivered') {
+          upsertMatchRecord(lockedMatchStore, {
+            ticketId: pendingAward.ticketId,
+            pool: codePool,
+            completedAt: pendingAward.preparedAt,
+            recordedAt: getNowIso(),
+            user: summarizeUser(payload.user),
+            summary: pendingAward.summary,
+            rewardStatus: 'ready',
+            rewardPreparedAt: pendingAward.preparedAt,
+            rewardBackend: 'newapi',
+            deliveryStatus: delivery.deliveryStatus,
+            creditAmountQuota,
+            creditAmountLabel,
+            deliveryError: delivery.deliveryError || null
+          });
+          await writeMatchStore(lockedMatchStore);
+          return {
+            kind: 'pending',
+            store: lockedStore,
+            matchStore: lockedMatchStore,
+            limitStatus: lockedLimitStatus,
+            deliveryStatus: delivery.deliveryStatus,
+            deliveryError: delivery.deliveryError || null
+          };
+        }
+
+        const claimedAt = delivery.creditedAt || getNowIso();
+        const claimedRecord = upsertMatchRecord(lockedMatchStore, {
+          ticketId: pendingAward.ticketId,
+          pool: codePool,
+          completedAt: pendingAward.preparedAt,
+          recordedAt: claimedAt,
+          user: summarizeUser(payload.user),
+          summary: pendingAward.summary,
+          rewardStatus: 'claimed',
+          rewardPreparedAt: pendingAward.preparedAt,
+          claimedAt,
+          creditedAt: claimedAt,
+          rewardBackend: 'newapi',
+          deliveryStatus: 'delivered',
+          creditAmountQuota,
+          creditAmountLabel,
+          topupTradeNo: delivery.topupTradeNo || null,
+          topupAmount: delivery.topupAmount || 0,
+          topupMoney: delivery.topupMoney || 0,
+          topupPaymentMethod: delivery.topupPaymentMethod || null,
+          topupPaymentProvider: delivery.topupPaymentProvider || null,
+          newapiUserId: delivery.newapiUserId || null,
+          deliveryError: null
+        });
+        await writeMatchStore(lockedMatchStore);
+        return {
+          kind: 'claimed',
+          store: lockedStore,
+          matchStore: lockedMatchStore,
+          claim: summarizeRewardClaimFromMatchRecord(claimedRecord, payload.rewardDelivery),
+          limitStatus: lockedLimitStatus
+        };
+      });
+
+      if (deliveryResult.kind === 'existing' || deliveryResult.kind === 'claimed') {
+        payload.session.pendingAward = null;
+        payload.session.lastClaimResult = deliveryResult.claim;
+        const nextState = buildRewardsPayload(
+          deliveryResult.store,
+          deliveryResult.matchStore,
+          payload,
+          deliveryResult.claim.creditedAt || getNowIso()
+        );
+        sendJson(res, 200, {
+          ...nextState,
+          assignedCdk: null,
+          assignedReward: deliveryResult.claim,
+          newlyClaimed: deliveryResult.kind === 'claimed',
+          limitStatus: deliveryResult.limitStatus || limitStatus,
+          rewardPool,
+          codePool,
+          rewardBackend: 'newapi',
+          deliveryStatus: deliveryResult.claim.deliveryStatus || 'delivered',
+          creditAmountQuota: deliveryResult.claim.creditAmountQuota || 0,
+          creditAmountLabel: deliveryResult.claim.creditAmountLabel || creditAmountLabel,
+          deliveryError: deliveryResult.claim.deliveryError || null
+        });
+        return;
+      }
+
+      if (deliveryResult.kind === 'limit_reached') {
+        payload.session.lastClaimResult = null;
+        sendJson(res, 409, {
+          error: 'daily_limit_reached',
+          rewardPool,
+          codePool,
+          limitStatus: deliveryResult.limitStatus,
+          rewardBackend: 'newapi',
+          deliveryStatus: 'ready',
+          creditAmountQuota,
+          creditAmountLabel,
+          deliveryError: null
+        });
+        return;
+      }
+
+      payload.session.lastClaimResult = null;
+      sendJson(
+        res,
+        deliveryResult.deliveryStatus === 'delivery_failed' ? 502 : 409,
+        {
+          error: deliveryResult.deliveryStatus,
+          rewardPool,
+          codePool,
+          limitStatus: deliveryResult.limitStatus || limitStatus,
+          rewardBackend: 'newapi',
+          deliveryStatus: deliveryResult.deliveryStatus,
+          creditAmountQuota,
+          creditAmountLabel,
+          deliveryError: deliveryResult.deliveryError || null
+        }
+      );
       return;
     }
 
@@ -4275,7 +6036,12 @@ export function createApp(options = {}) {
       sendJson(res, 409, {
         error: 'cdk_pool_empty',
         rewardPool,
-        codePool
+        codePool,
+        rewardBackend: 'cdk',
+        deliveryStatus: 'ready',
+        creditAmountQuota: 0,
+        creditAmountLabel: null,
+        deliveryError: null
       });
       return;
     }
@@ -4305,32 +6071,127 @@ export function createApp(options = {}) {
       rewardStatus: 'claimed',
       rewardPreparedAt: pendingAward.preparedAt,
       claimedAt: nextAvailable.claimedAt,
-      assignedCode: nextAvailable.code
+      creditedAt: nextAvailable.claimedAt,
+      assignedCode: nextAvailable.code,
+      rewardBackend: 'cdk',
+      deliveryStatus: 'delivered',
+      creditAmountQuota: 0,
+      deliveryError: null
     });
     await writeMatchStore(matchStore);
     payload.session.pendingAward = null;
+    const claimedMatchRecord = findClaimedMatchForUserByTicket(matchStore, payload.user, pendingAward.ticketId);
+    const assignedReward = summarizeRewardClaimFromMatchRecord(claimedMatchRecord, payload.rewardDelivery);
+    payload.session.lastClaimResult = assignedReward;
     const nextAvailableCounts = getAvailableCounts(store);
-    const claimSummary = getUserClaimSummary(store, userKey);
     const nextDailyClaimSummary = getUserDailyClaimSummary(
-      store,
+      matchStore,
       userKey,
       payload.rewardPolicy,
       nextAvailable.claimedAt
     );
     const nextLimitStatus = getRewardLimitStatus(pendingSummary, payload.rewardPolicy, nextDailyClaimSummary);
+    const nextState = buildRewardsPayload(store, matchStore, payload, nextAvailable.claimedAt);
 
     sendJson(res, 200, {
+      ...nextState,
       assignedCdk: summarizeCdk(nextAvailable),
+      assignedReward,
       newlyClaimed: true,
       availableCount: candidatePools.reduce((sum, pool) => sum + selectPoolCount(nextAvailableCounts, pool), 0),
       availableCounts: nextAvailableCounts,
-      claimCount: claimSummary.total,
-      claimCounts: claimSummary.byPool,
       dailyClaims: nextDailyClaimSummary,
       limitStatus: nextLimitStatus,
       rewardPool,
-      codePool: nextAvailable.pool || codePool
+      codePool: nextAvailable.pool || codePool,
+      rewardBackend: 'cdk',
+      deliveryStatus: 'delivered',
+      creditAmountQuota: 0,
+      creditAmountLabel: null,
+      deliveryError: null
     });
+  }
+
+  async function handleRedeemCode(req, res) {
+    if (req.method !== 'POST') {
+      sendMethodNotAllowed(res);
+      return;
+    }
+
+    const payload = await requireUser(req, res);
+    if (!payload) return;
+
+    let body;
+    try {
+      body = await readJsonBody(req);
+    } catch (error) {
+      sendJson(res, 400, {
+        error: error.message === 'request_too_large' ? 'request_too_large' : 'invalid_json'
+      });
+      return;
+    }
+
+    const code = typeof body?.code === 'string' ? body.code.trim() : '';
+    if (!code) {
+      sendJson(res, 400, { error: 'missing_code' });
+      return;
+    }
+
+    const userKey = getUserKey(payload.user);
+    const rewardDelivery = payload.rewardDelivery;
+
+    const deliveryResult = await withUserRewardDeliveryLock(userKey, async () => {
+      const store = await readRedeemCodeStore();
+      const entry = findRedeemCode(store, code);
+
+      if (!entry) {
+        return { status: 404, body: { error: 'redeem_code_not_found' } };
+      }
+
+      if (entry.status === 'disabled') {
+        return { status: 409, body: { error: 'redeem_code_disabled' } };
+      }
+
+      const existingClaims = countRedeemClaimsForUser(entry, userKey);
+      if (existingClaims >= entry.maxClaimsPerUser) {
+        return { status: 409, body: { error: 'already_redeemed' } };
+      }
+
+      const creditAmountQuota = entry.creditAmountQuota;
+      if (creditAmountQuota <= 0) {
+        return { status: 409, body: { error: 'redeem_code_invalid' } };
+      }
+
+      const creditResult = await creditNewApiQuotaForUser(payload.user, creditAmountQuota, rewardDelivery);
+      const claim = {
+        userKey,
+        claimedAt: getNowIso(),
+        deliveryStatus: creditResult.deliveryStatus || 'delivered',
+        deliveryError: creditResult.deliveryError || null
+      };
+
+      const targetEntry = findRedeemCode(store, code);
+      if (targetEntry) {
+        targetEntry.claims.push(claim);
+        await writeRedeemCodeStore(store);
+      }
+
+      return {
+        status: 200,
+        body: {
+          newlyClaimed: true,
+          code: entry.code,
+          note: entry.note || '',
+          deliveryStatus: creditResult.deliveryStatus || 'delivered',
+          deliveryError: creditResult.deliveryError || null,
+          creditAmountQuota,
+          creditAmountLabel: formatCreditAmountLabel(creditAmountQuota, rewardDelivery),
+          creditedAt: creditResult.creditedAt || null
+        }
+      };
+    });
+
+    sendJson(res, deliveryResult.status, deliveryResult.body);
   }
 
   async function handleAdminListCdks(req, res) {
@@ -4364,6 +6225,7 @@ export function createApp(options = {}) {
       summary: cdkSummary,
       matchSummary,
       rewardPolicy: payload.rewardPolicy,
+      rewardDelivery: payload.rewardDelivery,
       storedRewardPolicy: storedConfig.rewardPolicy,
       rewardPolicyOverrides: readRewardPolicyOverrideSources()
     });
@@ -4635,6 +6497,7 @@ export function createApp(options = {}) {
 
     sendJson(res, 200, {
       rewardPolicy: payload.rewardPolicy,
+      rewardDelivery: payload.rewardDelivery,
       storedRewardPolicy: storedConfig.rewardPolicy,
       rewardPolicyOverrides: readRewardPolicyOverrideSources()
     });
@@ -4672,6 +6535,7 @@ export function createApp(options = {}) {
     sendJson(res, 200, {
       saved: true,
       rewardPolicy: nextAppConfig.rewardPolicy,
+      rewardDelivery: nextAppConfig.rewardDelivery,
       storedRewardPolicy,
       rewardPolicyOverrides: readRewardPolicyOverrideSources()
     });
@@ -4864,6 +6728,118 @@ export function createApp(options = {}) {
       addedItems: addedItems.map(summarizeCdk),
       skippedCodes
     });
+  }
+
+  async function handleAdminListRedeemCodes(req, res) {
+    const payload = await requireAdmin(req, res);
+    if (!payload) return;
+
+    const store = await readRedeemCodeStore();
+    sendJson(res, 200, {
+      codes: store.codes.map(summarizeRedeemCodeForAdmin)
+    });
+  }
+
+  async function handleAdminUpsertRedeemCode(req, res) {
+    if (req.method !== 'POST') {
+      sendMethodNotAllowed(res);
+      return;
+    }
+
+    const payload = await requireAdmin(req, res);
+    if (!payload) return;
+
+    let body;
+    try {
+      body = await readJsonBody(req);
+    } catch (error) {
+      sendJson(res, 400, {
+        error: error.message === 'request_too_large' ? 'request_too_large' : 'invalid_json'
+      });
+      return;
+    }
+
+    const code = typeof body?.code === 'string' ? body.code.trim() : '';
+    if (!code) {
+      sendJson(res, 400, { error: 'missing_code' });
+      return;
+    }
+
+    const creditAmountQuota = normalizeNonNegativeInteger(body?.creditAmountQuota, 0);
+    if (creditAmountQuota <= 0) {
+      sendJson(res, 400, { error: 'invalid_amount' });
+      return;
+    }
+
+    const note = typeof body?.note === 'string' ? body.note.trim().slice(0, 200) : '';
+    const status = body?.status === 'disabled' ? 'disabled' : 'active';
+    const maxClaimsPerUser = Math.max(1, normalizeNonNegativeInteger(body?.maxClaimsPerUser, 1));
+    const now = getNowIso();
+
+    const store = await readRedeemCodeStore();
+    const existing = findRedeemCode(store, code);
+    const summary = {
+      code,
+      creditAmountQuota,
+      note,
+      status,
+      maxClaimsPerUser,
+      createdAt: existing?.createdAt || now,
+      createdBy: existing?.createdBy || summarizeUser(payload.user),
+      claims: existing?.claims || []
+    };
+
+    if (existing) {
+      Object.assign(existing, summary);
+    } else {
+      store.codes.push(summary);
+    }
+
+    await writeRedeemCodeStore(store);
+
+    sendJson(res, 200, {
+      code: summarizeRedeemCodeForAdmin(summary),
+      created: !existing
+    });
+  }
+
+  async function handleAdminToggleRedeemCode(req, res) {
+    if (req.method !== 'POST') {
+      sendMethodNotAllowed(res);
+      return;
+    }
+
+    const payload = await requireAdmin(req, res);
+    if (!payload) return;
+
+    let body;
+    try {
+      body = await readJsonBody(req);
+    } catch (error) {
+      sendJson(res, 400, {
+        error: error.message === 'request_too_large' ? 'request_too_large' : 'invalid_json'
+      });
+      return;
+    }
+
+    const code = typeof body?.code === 'string' ? body.code.trim() : '';
+    if (!code) {
+      sendJson(res, 400, { error: 'missing_code' });
+      return;
+    }
+
+    const status = body?.status === 'active' ? 'active' : 'disabled';
+    const store = await readRedeemCodeStore();
+    const entry = findRedeemCode(store, code);
+    if (!entry) {
+      sendJson(res, 404, { error: 'redeem_code_not_found' });
+      return;
+    }
+
+    entry.status = status;
+    await writeRedeemCodeStore(store);
+
+    sendJson(res, 200, { code: summarizeRedeemCodeForAdmin(entry) });
   }
 
   function sendPvpError(req, res, error) {
@@ -5168,7 +7144,7 @@ export function createApp(options = {}) {
       return;
     }
 
-    if (requestUrl.pathname === '/api/cdks/me') {
+    if (requestUrl.pathname === '/api/cdks/me' || requestUrl.pathname === '/api/rewards/me') {
       await handleGetMyCdk(req, res);
       return;
     }
@@ -5178,13 +7154,37 @@ export function createApp(options = {}) {
       return;
     }
 
+    if (requestUrl.pathname === '/api/awards/pve-event') {
+      await handlePveWitnessEvent(req, res);
+      return;
+    }
+
     if (requestUrl.pathname === '/api/awards/prepare') {
       await handlePrepareMatchAward(req, res);
       return;
     }
 
-    if (requestUrl.pathname === '/api/cdks/claim') {
+    if (requestUrl.pathname === '/api/cdks/claim' || requestUrl.pathname === '/api/rewards/claim') {
       await handleClaimCdk(req, res);
+      return;
+    }
+
+    if (requestUrl.pathname === '/api/redeem' && req.method === 'POST') {
+      await handleRedeemCode(req, res);
+      return;
+    }
+
+    if (requestUrl.pathname === '/api/admin/redeem-codes' && req.method === 'GET') {
+      await handleAdminListRedeemCodes(req, res);
+      return;
+    }
+
+    if (requestUrl.pathname === '/api/admin/redeem-codes' && req.method === 'POST') {
+      if (req.headers['x-redeem-action'] === 'toggle') {
+        await handleAdminToggleRedeemCode(req, res);
+      } else {
+        await handleAdminUpsertRedeemCode(req, res);
+      }
       return;
     }
 
@@ -5396,7 +7396,9 @@ export function createApp(options = {}) {
     async start() {
       await ensureDataFiles();
       pvpSweepTimer = setInterval(() => {
-        pvpService.cleanup().catch(() => {});
+        pvpService.cleanup().catch((error) => {
+          console.error('[pvp] cleanup failed', error);
+        });
       }, pvpSweepIntervalMs);
       await new Promise((resolve, reject) => {
         server.once('error', reject);

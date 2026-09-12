@@ -329,11 +329,11 @@ function renderSession(session) {
   elements.loginLink.classList.add('hidden');
   elements.logoutButton.classList.remove('hidden');
   elements.refreshButton.classList.remove('hidden');
-  elements.sessionText.textContent = session.user?.displayName || session.user?.username || '已登录';
+  elements.sessionText.textContent = session.user?.username || session.user?.displayName || '已登录';
 
   if (session.user?.avatarUrl) {
     elements.sessionAvatar.src = session.user.avatarUrl;
-    elements.sessionAvatar.alt = session.user.displayName || session.user.username || 'avatar';
+    elements.sessionAvatar.alt = session.user.username || session.user.displayName || 'avatar';
     elements.sessionAvatar.classList.remove('hidden');
   } else {
     elements.sessionAvatar.classList.add('hidden');
@@ -366,7 +366,7 @@ function renderCdkTable(items) {
 
   const rows = items
     .map((item) => {
-      const claimedBy = item.claimedBy?.displayName || item.claimedBy?.username || '-';
+      const claimedBy = item.claimedBy?.username || item.claimedBy?.displayName || '-';
       const statusText = getLocalizedStatus(item.status);
       const poolLabel = getPoolLabel(item.pool);
       const poolClass = getPoolBadgeClass(item.pool);
@@ -404,7 +404,7 @@ function renderMatchTable(items, summary) {
 
   const rows = items
     .map((item) => {
-      const playerName = item.user?.displayName || item.user?.username || '-';
+      const playerName = item.user?.username || item.user?.displayName || '-';
       const summaryData = item.summary || null;
       const rewardStatus = item.rewardStatus || 'not_eligible';
       const rewardText = item.assignedCode

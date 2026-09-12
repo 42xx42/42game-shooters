@@ -9,6 +9,7 @@
     "start": "node server.mjs",
     "dev": "node server.mjs",
     "test:auth": "node scripts/auth-cdk.smoke.test.mjs",
+    "test:newapi": "node scripts/newapi-reward.integration.test.mjs",
     "test:pvp": "node scripts/pvp-combat-core.test.mjs && node scripts/pvp-room.smoke.test.mjs",
     "test:security": "node scripts/historical-auto-claimer.regression.test.mjs"
   }

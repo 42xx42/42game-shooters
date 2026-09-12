@@ -49,7 +49,7 @@ export function createPvpReplayViewer({ apiRequest, formatDateTime }) {
 
   function getPlayerName(playerMap, userId) {
     const player = playerMap.get(String(userId || ''));
-    return player?.displayName || player?.username || String(userId || '-');
+    return player?.username || player?.displayName || String(userId || '-');
   }
 
   function getReplayMapId() {
@@ -349,7 +349,7 @@ export function createPvpReplayViewer({ apiRequest, formatDateTime }) {
       <div class="pvp-replay-card"><strong>回放</strong><span>${escapeHtml([getStatusText(replay), replay?.fileName || null].filter(Boolean).join(' | ') || '暂无')}</span></div>
       <div class="pvp-replay-card"><strong>统计</strong><span>${escapeHtml(state.content?.summary ? `${Number(state.content.summary.snapshotCount || 0)} 帧 / ${Number(state.content.summary.eventCount || 0)} 事件` : '摘要模式')}</span></div>
     `;
-    state.ui.filter.innerHTML = ['<option value="">全部玩家</option>', ...getPlayers().map((player) => `<option value="${escapeHtml(player.userId)}">${escapeHtml(player.displayName || player.username || player.userId)}</option>`)].join('');
+    state.ui.filter.innerHTML = ['<option value="">全部玩家</option>', ...getPlayers().map((player) => `<option value="${escapeHtml(player.userId)}">${escapeHtml(player.username || player.displayName || player.userId)}</option>`)].join('');
     state.ui.filter.value = getSelectedUserId();
     state.ui.mapMeta.textContent = getCurrentEventBanner(playerMap) || (snapshot ? `剩余 ${Number(snapshot.timeLeft || 0).toFixed(1)}s` : '暂无画面');
     drawMap(snapshot, playerMap);
@@ -376,7 +376,7 @@ export function createPvpReplayViewer({ apiRequest, formatDateTime }) {
           </div>
           ${eventPanel.participants.map((item) => `
             <div class="pvp-replay-item">
-              <strong>${escapeHtml(item.user?.displayName || item.user?.username || item.user?.id || '-')}</strong>
+              <strong>${escapeHtml(item.user?.username || item.user?.displayName || item.user?.id || '-')}</strong>
               <span>${item.counted ? '计入' : '未计入'} | ${escapeHtml(item.reason || '-')}</span>
               <span>积分变化 ${Number(item.scoreDelta || 0)} | 赛后排名 ${item.rankAfterMatch == null ? '-' : `#${Number(item.rankAfterMatch)}`} | 赛后场次 ${Number(item.matchesPlayedAfterMatch || 0)}</span>
             </div>

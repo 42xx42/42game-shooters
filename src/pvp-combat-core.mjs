@@ -446,7 +446,7 @@ function createPlayerState(user, seatIndex, mode, mapId) {
     userId: String(user.id || user.userId || seatIndex + 1),
     userKey: String(user.userKey || user.id || user.userId || seatIndex + 1),
     username: String(user.username || ''),
-    displayName: String(user.displayName || user.username || user.id || `Player ${seatIndex + 1}`),
+    displayName: String(user.username || user.displayName || user.id || `Player ${seatIndex + 1}`),
     avatarUrl: user.avatarUrl || null,
     spawn: { x: spawn.x, z: spawn.z },
     x: spawn.x,

@@ -470,6 +470,124 @@ const FRONTIER_COMBAT_SPAWNS = Object.freeze({
   ])
 });
 
+const BACKALLEY_ARENA = Object.freeze({
+  width: 36,
+  depth: 24,
+  bounds: Object.freeze({
+    minX: -18,
+    maxX: 18,
+    minZ: -12,
+    maxZ: 12
+  }),
+  ground: Object.freeze({
+    width: 48,
+    depth: 34
+  })
+});
+
+const BACKALLEY_COVER_LAYOUT = Object.freeze([
+  freezePlacement('Container_Small', -13.8, -7.8, 0.08, 4.2, 2.2),
+  freezePlacement('Container_Small', -14.2, 2.2, Math.PI / 2, 4.2, 2.2),
+  freezePlacement('Structure_1', -11.6, -1.4, 0, 2.5, 2.5),
+  freezePlacement('Structure_1', -9.4, 7.6, 0, 2.5, 2.5),
+  freezePlacement('Barrier_Large', -6.8, -8.4, Math.PI / 2, 3.6, 1.2),
+  freezePlacement('Barrier_Large', -6.2, -3.2, 0, 3.6, 1.2),
+  freezePlacement('Barrier_Large', -7.4, 3.6, 0, 3.6, 1.2),
+  freezePlacement('Barrier_Large', -5.8, 8.2, Math.PI / 2, 3.6, 1.2),
+  freezePlacement('SackTrench', -14.8, 8.8, 0, 2.4, 1.2),
+  freezePlacement('SackTrench', -12.8, -10.1, Math.PI / 2, 2.4, 1.2),
+  freezePlacement('Crate', -4.2, -6.4, 0.15, 1.2, 1.2),
+  freezePlacement('Crate', -3.4, 0.8, -0.15, 1.2, 1.2),
+  freezePlacement('Pallet', -1.8, -9.2, 0.2, 1.4, 1.4),
+  freezePlacement('Sofa', -10.8, 10.2, Math.PI / 5, 2.0, 1.0),
+  freezePlacement('Container_Small', -0.4, -1.8, 0, 4.2, 2.2),
+  freezePlacement('Barrier_Large', 2.6, 3.8, Math.PI / 2, 3.6, 1.2),
+  freezePlacement('Crate', 1.4, -5.2, 0.1, 1.2, 1.2),
+  freezePlacement('Debris_BrokenCar', 8.8, -0.2, -Math.PI / 2, 3.5, 2.0),
+  freezePlacement('Barrier_Large', 12.2, -6.2, Math.PI / 2, 3.6, 1.2),
+  freezePlacement('Barrier_Large', 11.6, 5.8, Math.PI / 2, 3.6, 1.2),
+  freezePlacement('SackTrench', 15.1, -0.6, Math.PI / 2, 2.4, 1.2),
+  freezePlacement('Sofa', 8.4, 8.8, -Math.PI / 3, 2.0, 1.0),
+  freezePlacement('Pallet', 10.4, -9.4, 0.15, 1.4, 1.4),
+  freezePlacement('CardboardBoxes_2', 4.2, 9.4, -0.1, 1.1, 1.1),
+  freezePlacement('CardboardBoxes_3', 13.8, 9.6, 0.2, 1.1, 1.1)
+]);
+
+const BACKALLEY_DECORATIVE_PLACEMENTS = Object.freeze([
+  freezeDecor('TrafficCone', -15.8, -2.6, 0.1),
+  freezeDecor('TrafficCone', -9.4, 10.6, -0.2),
+  freezeDecor('TrafficCone', 15.8, 2.2, -0.1),
+  freezeDecor('TrafficCone', 4.8, -10.4, 0.2),
+  freezeDecor('CardboardBoxes_1', -16.2, 6.4, 0.3),
+  freezeDecor('CardboardBoxes_4', -6.6, -10.2, -0.3),
+  freezeDecor('CardboardBoxes_2', 12.8, 10.6, 0.2),
+  freezeDecor('CardboardBoxes_3', 2.4, 8.8, -0.2),
+  freezeDecor('Debris_Tires', -11.2, 4.2, 0.5),
+  freezeDecor('Debris_Tires', 9.8, -5.2, -0.5),
+  freezeDecor('Debris_Pile', -15.4, -10.2, 0.4),
+  freezeDecor('Debris_Pile', 14.4, 7.4, -0.4),
+  freezeDecor('Debris_Papers_1', -2.4, 4.4, 0.6),
+  freezeDecor('Debris_Papers_2', 3.8, -2.6, -0.6),
+  freezeDecor('Debris_Papers_3', -8.8, -0.8, 0.4),
+  freezeDecor('GasCan', -5.2, 6.6, 0.2),
+  freezeDecor('GasCan', 10.6, -8.2, -0.3),
+  freezeDecor('WoodPlanks', -13.6, 10.4, 0.5),
+  freezeDecor('WoodPlanks', 6.8, 9.8, -0.5),
+  freezeDecor('Pallet_Broken', 14.8, -9.2, 0.3),
+  freezeDecor('Pallet_Broken', -2.6, -10.4, -0.4),
+  freezeDecor('Pipes', -17.1, 0, Math.PI / 2),
+  freezeDecor('Pipes', 17.1, 0, -Math.PI / 2),
+  freezeDecor('TrashContainer', -17.2, -7.4, 0.1),
+  freezeDecor('TrashContainer_Open', 16.8, 9.4, -0.1),
+  freezeDecor('StreetLight', -16.6, 10.8, 0),
+  freezeDecor('StreetLight', 16.2, -8.8, Math.PI),
+  freezeDecor('Sign', -16.8, 11.4, -0.2),
+  freezeDecor('Sign', 15.4, -10.6, 0.3)
+]);
+
+const BACKALLEY_LOCAL_SPAWN_POINTS = Object.freeze([
+  freezeVector3(-15.2, 0, -1.4),
+  freezeVector3(14.2, 0, 1.2),
+  freezeVector3(-2.8, 0, 9.6),
+  freezeVector3(7.8, 0, -9.2)
+]);
+
+const BACKALLEY_LOCAL_BARREL_POSITIONS = Object.freeze([
+  freezeVector3(-11.8, 0, -8.6),
+  freezeVector3(-8.2, 0, 7.2),
+  freezeVector3(9.8, 0, -6.8),
+  freezeVector3(12.8, 0, 7.8),
+  freezeVector3(1.8, 0, 0)
+]);
+
+const BACKALLEY_LOCAL_NAV_SEEDS = Object.freeze([
+  freezeVector2(-15, -2),
+  freezeVector2(-13, 8),
+  freezeVector2(-9, -6),
+  freezeVector2(-8, 2),
+  freezeVector2(-4, 8),
+  freezeVector2(-1, -3),
+  freezeVector2(0, 0),
+  freezeVector2(3, 4),
+  freezeVector2(6, -8),
+  freezeVector2(7, 1),
+  freezeVector2(11, 7),
+  freezeVector2(14, -1)
+]);
+
+const BACKALLEY_COMBAT_SPAWNS = Object.freeze({
+  duel: Object.freeze([
+    freezeVector2(-14.8, -1.6),
+    freezeVector2(13.8, 1.8)
+  ]),
+  deathmatch: Object.freeze([
+    freezeVector2(-16.0, -9.6),
+    freezeVector2(15.2, 8.8),
+    freezeVector2(-2.8, 10.2),
+    freezeVector2(14.8, -8.6)
+  ])
+});
+
 const BUNKER_ARENA = Object.freeze({
   width: 20,
   depth: 14,
@@ -864,6 +982,34 @@ export const PVP_MAPS = Object.freeze({
       }),
       coverLayout: WARZONE_COVER_LAYOUT,
       spawnByMode: WARZONE_COMBAT_SPAWNS,
+      fallbackSizes: CLASSIC_FALLBACK_SIZES
+    })
+  }),
+  backalley: Object.freeze({
+    id: 'backalley',
+    name: 'BackAlley',
+    arena: BACKALLEY_ARENA,
+    local: Object.freeze({
+      spawnPoints: BACKALLEY_LOCAL_SPAWN_POINTS,
+      coverLayout: BACKALLEY_COVER_LAYOUT,
+      decorativePlacements: BACKALLEY_DECORATIVE_PLACEMENTS,
+      fallbackSizes: CLASSIC_FALLBACK_SIZES,
+      barrelPositions: BACKALLEY_LOCAL_BARREL_POSITIONS,
+      navSeedPoints: BACKALLEY_LOCAL_NAV_SEEDS,
+      fence: Object.freeze({
+        key: 'Fence_Long',
+        offset: 0.4,
+        scale: 1.1
+      })
+    }),
+    combat: Object.freeze({
+      arena: Object.freeze({
+        width: BACKALLEY_ARENA.width,
+        depth: BACKALLEY_ARENA.depth,
+        bounds: BACKALLEY_ARENA.bounds
+      }),
+      coverLayout: BACKALLEY_COVER_LAYOUT,
+      spawnByMode: BACKALLEY_COMBAT_SPAWNS,
       fallbackSizes: CLASSIC_FALLBACK_SIZES
     })
   })
